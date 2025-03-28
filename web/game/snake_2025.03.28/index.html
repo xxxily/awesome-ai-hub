@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>奇幻贪吃蛇</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        h1 {
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #0088ff;
+            margin-bottom: 10px;
+        }
+        
+        .game-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        #game-board {
+            border: 3px solid #4a4e69;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            background-color: #0f0f1a;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: linear-gradient(45deg, #4cc9f0, #4895ef);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(45deg, #4895ef, #4361ee);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        .difficulty {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .difficulty-btn {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        
+        .active {
+            background: linear-gradient(45deg, #f72585, #b5179e);
+            box-shadow: 0 0 10px rgba(247, 37, 133, 0.7);
+        }
+        
+        .score-display {
+            font-size: 24px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            gap: 30px;
+        }
+        
+        .special-effects {
+            position: absolute;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .instructions {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 600px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+        
+        .power-up {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .trail {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: rgba(76, 201, 240, 0.5);
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>奇幻贪吃蛇</h1>
+    
+    <div class="difficulty">
+        <button class="difficulty-btn active" data-difficulty="easy">简单模式</button>
+        <button class="difficulty-btn" data-difficulty="medium">中等模式</button>
+        <button class="difficulty-btn" data-difficulty="hard">困难模式</button>
+    </div>
+    
+    <div class="score-display">
+        <div>分数: <span id="score">0</span></div>
+        <div>长度: <span id="length">1</span></div>
+        <div>速度: <span id="speed">1x</span></div>
+    </div>
+    
+    <div class="game-container">
+        <canvas id="game-board" width="500" height="500"></canvas>
+        <div class="special-effects" id="effects"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="start-btn">开始游戏</button>
+        <button id="pause-btn">暂停</button>
+        <button id="wall-toggle">墙壁: 开启</button>
+        <button id="rainbow-toggle">彩虹模式: 关闭</button>
+    </div>
+    
+    <div class="instructions">
+        <h3>游戏说明:</h3>
+        <p>- 使用方向键或WASD控制蛇的移动</p>
+        <p>- 普通食物(绿色): +1分，蛇身增长</p>
+        <p>- 特殊食物(闪烁): 随机效果(加速/减速/穿墙/彩虹等)</p>
+        <p>- 可以穿过自己的身体，但撞墙会结束游戏(除非穿墙模式激活)</p>
+        <p>- 彩虹模式下蛇身会变换颜色，分数双倍</p>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
