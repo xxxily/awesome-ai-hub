@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>星际重力跑酷</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        :root {
+            --bg-color: #1a1a2e;
+            --player-color: #4cc9f0;
+            --obstacle-color: #f72585;
+            --coin-color: #f9c74f;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Press Start 2P', cursive;
+            background: var(--bg-color);
+            touch-action: manipulation;
+            color: white;
+        }
+        
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #game-canvas {
+            display: block;
+            background: linear-gradient(to bottom, #16213e 0%, #1a1a2e 100%);
+            width: 100%;
+            height: 100%;
+        }
+        
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 1.2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #combo-display {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            font-size: 0.8rem;
+            color: var(--coin-color);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.7);
+            z-index: 10;
+        }
+        
+        .screen-title {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            color: var(--player-color);
+            text-shadow: 0 0 10px rgba(76, 201, 240, 0.5);
+        }
+        
+        .screen-text {
+            font-size: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            line-height: 1.5;
+            max-width: 80%;
+        }
+        
+        .game-button {
+            padding: 15px 30px;
+            font-family: inherit;
+            font-size: 1.2rem;
+            background: var(--obstacle-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s;
+            box-shadow: 0 5px 0 rgba(247, 37, 133, 0.5);
+        }
+        
+        .game-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 0 rgba(247, 37, 133, 0.5);
+        }
+        
+        .game-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 3px 0 rgba(247, 37, 133, 0.5);
+        }
+        
+        #mobile-controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            display: none;
+            justify-content: center;
+            gap: 60px;
+            pointer-events: auto;
+        }
+        
+        .mobile-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            color: white;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        #particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 768px) {
+            .screen-title {
+                font-size: 1.8rem;
+            }
+            
+            .screen-text {
+                font-size: 0.8rem;
+            }
+            
+            .game-button {
+                padding: 12px 24px;
+                font-size: 1rem;
+            }
+            
+            #mobile-controls {
+                display: flex;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui-overlay">
+            <div id="score-display">SCORE: 0</div>
+            <div id="combo-display">COMBO x1</div>
+            
+            <div id="particles"></div>
+            
+            <div id="mobile-controls">
+                <div id="flip-btn" class="mobile-btn">↻</div>
+            </div>
+        </div>
+        
+        <div id="start-screen">
+            <h1 class="screen-title">GRAVITY RUNNER</h1>
+            <p class="screen-text">Use SPACE to flip gravity<br>Avoid red obstacles<br>Collect golden coins</p>
+            <button id="start-btn" class="game-button">START GAME</button>
+        </div>
+        
+        <div id="game-over-screen" style="display: none;">
+            <h1 class="screen-title">GAME OVER</h1>
+            <p class="screen-text" id="final-score">SCORE: 0</p>
+            <button id="restart-btn" class="game-button">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置
+        const config = {
+            player: {
+                width: 30,
+                height: 30,
+                color: '#4cc9f0',
+                glowColor: 'rgba(76, 201, 240, 0.5)',
+                jumpForce: 15,
+                gravity: 0.5
+            },
+            obstacle: {
+                minWidth: 20,
+                maxWidth: 40,
+                minHeight: 50,
+                maxHeight: 150,
+                color: '#f72585',
+                speed: 3,
+                spawnRate: 1500 // ms
+            },
+            coin: {
+                size: 15,
+                color: '#f9c74f',
+                glowColor: 'rgba(249, 199, 79, 0.5)',
+                spawnChance: 0.3,
+                value: 100,
+                spinSpeed: 0.1
+            },
+            game: {
+                speedIncreaseInterval: 5000, // ms
+                speedIncreaseAmount: 0.2,
+                maxSpeed: 8,
+                comboTime: 2000 // ms
+            }
+        };
+
+        // 游戏状态
+        let state = {
+            score: 0,
+            highScore: localStorage.getItem('highScore') || 0,
+            combo: 0,
+            lastComboTime: 0,
+            gameSpeed: config.obstacle.speed,
+            isPlaying: false,
+            gravity: 1,
+            playerY: 0,
+            playerVelocity: 0,
+            obstacles: [],
+            coins: [],
+            particles: [],
+            lastObstacleTime: 0,
+            lastSpeedIncrease: 0,
+            animationId: null,
+            isMobile: /Mobi|Android/i.test(navigator.userAgent)
+        };
+
+        // DOM元素
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score-display');
+        const comboDisplay = document.getElementById('combo-display');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreDisplay = document.getElementById('final-score');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const flipBtn = document.getElementById('flip-btn');
+        const particlesContainer = document.getElementById('particles');
+
+        // 初始化游戏
+        function initGame() {
+            // 设置画布尺寸
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 初始化玩家位置
+            state.playerY = canvas.height / 2 - config.player.height / 2;
+            
+            // 事件监听
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', startGame);
+            flipBtn.addEventListener('click', flipGravity);
+            
+            // 键盘控制
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'Space') {
+                    e.preventDefault();
+                    flipGravity();
+                }
+            });
+            
+            // 触摸控制（防止触摸时页面滚动）
+            document.addEventListener('touchmove', (e) => {
+                if (state.isPlaying) e.preventDefault();
+            }, { passive: false });
+            
+            // 显示移动控制按钮（如果是移动设备）
+            if (state.isMobile) {
+                document.getElementById('mobile-controls').style.display = 'flex';
+            }
+            
+            // 开始游戏循环（即使游戏未开始，也用于菜单动画）
+            gameLoop();
+        }
+
+        // 调整画布大小
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // 开始游戏
+        function startGame() {
+            // 重置游戏状态
+            state = {
+                ...state,
+                score: 0,
+                combo: 0,
+                gameSpeed: config.obstacle.speed,
+                isPlaying: true,
+                gravity: 1,
+                playerY: canvas.height / 2 - config.player.height / 2,
+                playerVelocity: 0,
+                obstacles: [],
+                coins: [],
+                particles: [],
+                lastObstacleTime: 0,
+                lastSpeedIncrease: performance.now()
+            };
+            
+            // 更新UI
+            scoreDisplay.textContent = `SCORE: ${state.score}`;
+            comboDisplay.style.opacity = '0';
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+        }
+
+        // 翻转重力
+        function flipGravity() {
+            if (!state.isPlaying) return;
+            
+            state.gravity *= -1;
+            state.playerVelocity = config.player.jumpForce * state.gravity;
+            
+            // 添加粒子效果
+            createParticles(
+                canvas.width / 4,
+                state.playerY + config.player.height / 2,
+                state.gravity > 0 ? '#4cc9f0' : '#f72585',
+                10
+            );
+            
+            // 播放声音（这里用简单的声音模拟）
+            playSound(200 + Math.random() * 100, 0.1);
+        }
+
+        // 游戏结束
+        function gameOver() {
+            state.isPlaying = false;
+            
+            // 更新最高分
+            if (state.score > state.highScore) {
+                state.highScore = state.score;
+                localStorage.setItem('highScore', state.highScore);
+            }
+            
+            // 显示游戏结束界面
+            finalScoreDisplay.textContent = `SCORE: ${state.score} | HIGH: ${state.highScore}`;
+            gameOverScreen.style.display = 'flex';
+            
+            // 游戏结束特效
+            createExplosion(
+                canvas.width / 4,
+                state.playerY + config.player.height / 2,
+                50
+            );
+        }
+
+        // 创建障碍物
+        function createObstacle() {
+            const now = performance.now();
+            if (now - state.lastObstacleTime < config.obstacle.spawnRate / (state.gameSpeed / config.obstacle.speed)) {
+                return;
+            }
+            
+            state.lastObstacleTime = now;
+            
+            const width = randomBetween(config.obstacle.minWidth, config.obstacle.maxWidth);
+            const height = randomBetween(config.obstacle.minHeight, config.obstacle.maxHeight);
+            
+            // 决定障碍物是在顶部还是底部
+            const isTop = Math.random() > 0.5;
+            
+            state.obstacles.push({
+                x: canvas.width,
+                y: isTop ? 0 : canvas.height - height,
+                width: width,
+                height: height,
+                isTop: isTop,
+                color: config.obstacle.color
+            });
+            
+            // 30%几率在障碍物旁边生成金币
+            if (Math.random() < config.coin.spawnChance) {
+                state.coins.push({
+                    x: canvas.width + width + 20,
+                    y: isTop ? 
+                        randomBetween(height + 50, canvas.height - 100) : 
+                        randomBetween(50, canvas.height - height - 50),
+                    size: config.coin.size,
+                    angle: 0,
+                    collected: false,
+                    color: config.coin.color
+                });
+            }
+        }
+
+        // 创建粒子
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                state.particles.push({
+                    x: x,
+                    y: y,
+                    size: randomBetween(2, 5),
+                    color: color,
+                    velocityX: randomBetween(-2, 2),
+                    velocityY: randomBetween(-2, 2),
+                    life: randomBetween(20, 40)
+                });
+            }
+        }
+
+        // 创建爆炸效果
+        function createExplosion(x, y, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 3 + 1;
+                
+                state.particles.push({
+                    x: x,
+                    y: y,
+                    size: randomBetween(3, 8),
+                    color: i % 2 === 0 ? '#f72585' : '#4cc9f0',
+                    velocityX: Math.cos(angle) * speed,
+                    velocityY: Math.sin(angle) * speed,
+                    life: randomBetween(30, 60)
+                });
+            }
+        }
+
+        // 播放声音（使用Web Audio API）
+        function playSound(freq, duration) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.value = freq;
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) {
+                console.log('Web Audio API not supported');
+            }
+        }
+
+        // 更新游戏状态
+        function update() {
+            if (!state.isPlaying) return;
+            
+            const now = performance.now();
+            
+            // 增加游戏难度（随时间推移）
+            if (now - state.lastSpeedIncrease > config.game.speedIncreaseInterval) {
+                state.lastSpeedIncrease = now;
+                state.gameSpeed = Math.min(
+                    state.gameSpeed + config.game.speedIncreaseAmount,
+                    config.game.maxSpeed
+                );
+            }
+            
+            // 创建障碍物
+            createObstacle();
+            
+            // 更新玩家位置
+            state.playerVelocity += config.player.gravity * state.gravity;
+            state.playerY += state.playerVelocity;
+            
+            // 检测玩家是否超出边界
+            if (state.playerY < 0) {
+                state.playerY = 0;
+                state.playerVelocity = 0;
+            } else if (state.playerY > canvas.height - config.player.height) {
+                state.playerY = canvas.height - config.player.height;
+                state.playerVelocity = 0;
+            }
+            
+            // 更新障碍物位置
+            state.obstacles = state.obstacles.filter(obstacle => {
+                obstacle.x -= state.gameSpeed;
+                
+                // 检测碰撞
+                const playerRight = canvas.width / 4 + config.player.width;
+                const playerBottom = state.playerY + config.player.height;
+                
+                if (
+                    obstacle.x < canvas.width / 4 + config.player.width &&
+                    obstacle.x + obstacle.width > canvas.width / 4 &&
+                    (
+                        (obstacle.isTop && state.playerY < obstacle.height) ||
+                        (!obstacle.isTop && playerBottom > canvas.height - obstacle.height)
+                    )
+                ) {
+                    gameOver();
+                    return false;
+                }
+                
+                return obstacle.x + obstacle.width > 0;
+            });
+            
+            // 更新金币位置
+            state.coins = state.coins.filter(coin => {
+                coin.x -= state.gameSpeed;
+                coin.angle += config.coin.spinSpeed;
+                
+                // 检测收集
+                if (!coin.collected) {
+                    const playerCenter = {
+                        x: canvas.width / 4 + config.player.width / 2,
+                        y: state.playerY + config.player.height / 2
+                    };
+                    
+                    const coinCenter = {
+                        x: coin.x + coin.size / 2,
+                        y: coin.y + coin.size / 2
+                    };
+                    
+                    const distance = Math.sqrt(
+                        Math.pow(playerCenter.x - coinCenter.x, 2) +
+                        Math.pow(playerCenter.y - coinCenter.y, 2)
+                    );
+                    
+                    if (distance < (config.player.width + coin.size) / 2) {
+                        coin.collected = true;
+                        state.score += config.coin.value * (state.combo + 1);
+                        scoreDisplay.textContent = `SCORE: ${state.score}`;
+                        
+                        // 增加连击
+                        state.combo++;
+                        state.lastComboTime = now;
+                        comboDisplay.textContent = `COMBO x${state.combo}`;
+                        comboDisplay.style.opacity = '1';
+                        
+                        // 特效
+                        createParticles(coinCenter.x, coinCenter.y, config.coin.color, 15);
+                        playSound(500, 0.2);
+                    }
+                }
+                
+                return coin.x + coin.size > 0;
+            });
+            
+            // 更新连击状态
+            if (now - state.lastComboTime > config.game.comboTime && state.combo > 0) {
+                state.combo = 0;
+                comboDisplay.style.opacity = '0';
+            }
+            
+            // 更新粒子
+            state.particles = state.particles.filter(p => {
+                p.x += p.velocityX;
+                p.y += p.velocityY;
+                p.life--;
+                return p.life > 0;
+            });
+        }
+
+        // 渲染游戏
+        function render() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制星空背景
+            drawStars();
+            
+            // 绘制玩家
+            drawPlayer();
+            
+            // 绘制障碍物
+            state.obstacles.forEach(drawObstacle);
+            
+            // 绘制金币
+            state.coins.forEach(drawCoin);
+            
+            // 绘制粒子
+            state.particles.forEach(drawParticle);
+        }
+
+        // 绘制星空背景
+        function drawStars() {
+            // 这是一个简化的实现，实际中可以预生成星星
+            ctx.fillStyle = 'white';
+            for (let i = 0; i < 100; i++) {
+                const x = (i * 12345) % canvas.width;
+                const y = (i * 54321) % canvas.height;
+                const size = (i % 3 + 1) / 2;
+                
+                ctx.globalAlpha = 0.5 + Math.random() * 0.5;
+                ctx.fillRect(x, y, size, size);
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        // 绘制玩家
+        function drawPlayer() {
+            // 玩家发光效果
+            ctx.shadowColor = config.player.glowColor;
+            ctx.shadowBlur = 15;
+            
+            ctx.fillStyle = config.player.color;
+            ctx.fillRect(
+                canvas.width / 4,
+                state.playerY,
+                config.player.width,
+                config.player.height
+            );
+            
+            // 重置阴影
+            ctx.shadowColor = 'transparent';
+            
+            // 根据重力方向绘制箭头指示
+            ctx.fillStyle = 'white';
+            const arrowSize = 5;
+            const arrowX = canvas.width / 4 + config.player.width / 2;
+            const arrowY = state.playerY + (state.gravity > 0 ? 
+                config.player.height + arrowSize + 2 : 
+                -arrowSize - 2);
+            
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - arrowSize, arrowY + (state.gravity > 0 ? -arrowSize : arrowSize));
+            ctx.lineTo(arrowX + arrowSize, arrowY + (state.gravity > 0 ? -arrowSize : arrowSize));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // 绘制障碍物
+        function drawObstacle(obstacle) {
+            ctx.fillStyle = obstacle.color;
+            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        }
+
+        // 绘制金币
+        function drawCoin(coin) {
+            if (coin.collected) return;
+            
+            ctx.save();
+            ctx.translate(coin.x + coin.size / 2, coin.y + coin.size / 2);
+            ctx.rotate(coin.angle);
+            
+            // 金币发光效果
+            ctx.shadowColor = config.coin.glowColor;
+            ctx.shadowBlur = 10;
+            
+            ctx.fillStyle = config.coin.color;
+            ctx.beginPath();
+            ctx.arc(0, 0, coin.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 金币细节
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.beginPath();
+            ctx.arc(0, 0, coin.size / 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        // 绘制粒子
+        function drawParticle(particle) {
+            ctx.globalAlpha = particle.life / 100;
+            ctx.fillStyle = particle.color;
+            ctx.fillRect(
+                particle.x - particle.size / 2,
+                particle.y - particle.size / 2,
+                particle.size,
+                particle.size
+            );
+            ctx.globalAlpha = 1;
+        }
+
+        // 游戏主循环
+        function gameLoop() {
+            update();
+            render();
+            state.animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // 辅助函数
+        function randomBetween(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>
