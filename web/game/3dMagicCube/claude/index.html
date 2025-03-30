@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>3D魔方</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        overflow: hidden;
+        font-family: 'Arial', sans-serif;
+        background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+        color: #fff;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #container {
+        flex: 1;
+        position: relative;
+      }
+      #ui-container {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 10;
+        background-color: rgba(0, 0, 0, 0.6);
+        padding: 15px;
+        border-radius: 10px;
+        backdrop-filter: blur(5px);
+        max-width: 300px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        transition: all 0.3s ease;
+      }
+      #ui-container.collapsed {
+        max-height: 50px;
+        overflow: hidden;
+      }
+      #toggle-ui {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      .control-group {
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 10px;
+      }
+      .control-group:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+      }
+      h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+        color: #4cc9f0;
+      }
+      button {
+        background-color: #4361ee;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        margin: 5px 5px 5px 0;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        font-size: 14px;
+      }
+      button:hover {
+        background-color: #3a0ca3;
+      }
+      button:active {
+        transform: scale(0.98);
+      }
+      select,
+      input {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px;
+        border-radius: 5px;
+        margin: 5px 0;
+        width: 100%;
+      }
+      label {
+        display: block;
+        margin-top: 8px;
+        font-size: 14px;
+      }
+      #loading-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #0f0f1a;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        transition: opacity 0.5s;
+      }
+      #loading-progress {
+        width: 200px;
+        height: 5px;
+        background-color: rgba(255, 255, 255, 0.2);
+        margin-top: 20px;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      #progress-bar {
+        height: 100%;
+        width: 0%;
+        background-color: #4cc9f0;
+        transition: width 0.3s;
+      }
+      #loading-text {
+        margin-top: 10px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.7);
+      }
+      .cube-state-input {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        margin-top: 10px;
+      }
+      .face-input {
+        margin-bottom: 10px;
+      }
+      .color-selector {
+        width: 25px;
+        height: 25px;
+        border-radius: 3px;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+      }
+      #manual-input-container {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.5s ease;
+      }
+      #manual-input-container.show {
+        max-height: 1000px;
+      }
+      #toast {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .help-icon {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        background-color: rgba(255, 255, 255, 0.3);
+        color: black;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 16px;
+        font-size: 12px;
+        margin-left: 5px;
+        cursor: help;
+      }
+      .tooltip {
+        position: relative;
+        display: inline-block;
+      }
+      .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+      }
+      .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+      }
+      #stats {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+      }
+      @media (max-width: 768px) {
+        #ui-container {
+          max-width: 90%;
+        }
+        button {
+          padding: 10px;
+          margin: 5px;
+          font-size: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading-screen">
+      <h1>3D魔方</h1>
+      <div id="loading-progress">
+        <div id="progress-bar"></div>
+      </div>
+      <div id="loading-text">加载中...</div>
+    </div>
+
+    <div id="container"></div>
+
+    <div id="ui-container">
+      <button id="toggle-ui">≡</button>
+      <div class="control-group">
+        <h2>魔方控制</h2>
+        <label for="cube-size">魔方阶数:</label>
+        <select id="cube-size">
+          <option value="2">2×2×2</option>
+          <option value="3" selected>3×3×3</option>
+          <option value="4">4×4×4</option>
+          <option value="5">5×5×5</option>
+        </select>
+        <button id="create-cube">生成魔方</button>
+        <button id="scramble">打乱魔方</button>
+        <button id="reset">重置魔方</button>
+      </div>
+
+      <div class="control-group">
+        <h2>自动还原</h2>
+        <label for="solve-speed">还原速度:</label>
+        <input type="range" id="solve-speed" min="1" max="100" value="50" />
+        <span id="speed-value">50</span>
+        <button id="solve">自动还原</button>
+        <button id="stop-solve">停止还原</button>
+      </div>
+
+      <div class="control-group">
+        <h2>
+          手动输入
+          <div class="tooltip">
+            <span class="help-icon">?</span>
+            <span class="tooltiptext">输入实体魔方的状态，然后可以查看解法或自动还原</span>
+          </div>
+        </h2>
+        <button id="toggle-manual-input">显示/隐藏输入面板</button>
+        <div id="manual-input-container">
+          <div id="manual-input-tabs">
+            <!-- 这里将动态生成魔方面的输入界面 -->
+          </div>
+          <button id="apply-manual-state">应用状态</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h2>操作说明</h2>
+        <p>- 拖动: 旋转整个魔方</p>
+        <p>- 点击+拖动: 旋转魔方层</p>
+        <p>- 双指缩放: 调整视图大小</p>
+        <p>- 双击: 重置视图</p>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/libs/stats.min.js"></script>
+    <script>
+      // 全局变量
+      let scene, camera, renderer, controls, stats
+      let cubeGroup,
+        cubes = []
+      let raycaster, mouse
+      let selectedFace = null
+      let isDragging = false
+      let dragStartPoint = new THREE.Vector2()
+      let currentSize = 3
+      let isAnimating = false
+      let animationQueue = []
+      let solveSpeed = 50
+      let isSolving = false
+      let cubeFaces = ['front', 'back', 'up', 'down', 'right', 'left']
+      let faceColors = {
+        front: 0xff0000, // 红
+        back: 0xffa500, // 橙
+        up: 0xffffff, // 白
+        down: 0xffff00, // 黄
+        right: 0x00ff00, // 绿
+        left: 0x0000ff, // 蓝
+      }
+      let colorNames = {
+        0xff0000: '红',
+        0xffa500: '橙',
+        0xffffff: '白',
+        0xffff00: '黄',
+        0x00ff00: '绿',
+        0x0000ff: '蓝',
+      }
+
+      // 加载进度
+      let loadingManager = new THREE.LoadingManager()
+      loadingManager.onProgress = function (url, loaded, total) {
+        let progress = (loaded / total) * 100
+        document.getElementById('progress-bar').style.width = progress + '%'
+        document.getElementById('loading-text').textContent = `加载中... ${Math.round(progress)}%`
+      }
+
+      loadingManager.onLoad = function () {
+        // 确保在初始化完成后关闭加载界面
+        setTimeout(() => {
+          document.getElementById('loading-screen').style.opacity = '0'
+          setTimeout(() => {
+            document.getElementById('loading-screen').style.display = 'none'
+          }, 500)
+        }, 500)
+      }
+
+      // 初始化
+      function init() {
+        // 场景设置
+        scene = new THREE.Scene()
+        scene.background = new THREE.Color(0x1a1a2e)
+
+        // 相机设置
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
+        camera.position.set(5, 5, 7)
+
+        // 渲染器设置
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          alpha: true,
+          preserveDrawingBuffer: true,
+        })
+        renderer.setSize(window.innerWidth, window.innerHeight)
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // 限制像素比以提高性能
+        renderer.shadowMap.enabled = true
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap // 更柔和的阴影
+        renderer.outputEncoding = THREE.sRGBEncoding // 更准确的颜色
+        document.getElementById('container').appendChild(renderer.domElement)
+
+        // 控制器设置
+        controls = new THREE.OrbitControls(camera, renderer.domElement)
+        controls.enableDamping = true
+        controls.dampingFactor = 0.05
+
+        // 光照设置
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+        scene.add(ambientLight)
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
+        directionalLight.position.set(5, 10, 7)
+        directionalLight.castShadow = true
+        directionalLight.shadow.camera.near = 0.1
+        directionalLight.shadow.camera.far = 50
+        directionalLight.shadow.camera.right = 15
+        directionalLight.shadow.camera.left = -15
+        directionalLight.shadow.camera.top = 15
+        directionalLight.shadow.camera.bottom = -15
+        scene.add(directionalLight)
+
+        // 性能监控
+        stats = new Stats()
+        stats.dom.style.cssText = 'position:absolute;top:10px;right:10px;'
+        document.getElementById('container').appendChild(stats.dom)
+
+        // 射线检测
+        raycaster = new THREE.Raycaster()
+        mouse = new THREE.Vector2()
+
+        // 创建魔方
+        cubeGroup = new THREE.Group()
+        scene.add(cubeGroup)
+        createCube(currentSize)
+
+        // 事件监听
+        window.addEventListener('resize', onWindowResize)
+        renderer.domElement.addEventListener('mousedown', onMouseDown)
+        renderer.domElement.addEventListener('mousemove', onMouseMove)
+        renderer.domElement.addEventListener('mouseup', onMouseUp)
+        renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false })
+        renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false })
+        renderer.domElement.addEventListener('touchend', onTouchEnd)
+        renderer.domElement.addEventListener('dblclick', resetCamera)
+
+        // UI事件
+        document.getElementById('cube-size').addEventListener('change', function () {
+          currentSize = parseInt(this.value)
+        })
+
+        document.getElementById('create-cube').addEventListener('click', function () {
+          createCube(currentSize)
+        })
+
+        document.getElementById('scramble').addEventListener('click', scrambleCube)
+        document.getElementById('reset').addEventListener('click', resetCube)
+        document.getElementById('solve').addEventListener('click', solveCube)
+        document.getElementById('stop-solve').addEventListener('click', stopSolve)
+
+        document.getElementById('solve-speed').addEventListener('input', function () {
+          solveSpeed = parseInt(this.value)
+          document.getElementById('speed-value').textContent = solveSpeed
+        })
+
+        document.getElementById('toggle-ui').addEventListener('click', function () {
+          document.getElementById('ui-container').classList.toggle('collapsed')
+          this.textContent = document.getElementById('ui-container').classList.contains('collapsed') ? '≡' : '×'
+        })
+
+        document.getElementById('toggle-manual-input').addEventListener('click', function () {
+          document.getElementById('manual-input-container').classList.toggle('show')
+          setupManualInputUI(currentSize)
+        })
+
+        document.getElementById('apply-manual-state').addEventListener('click', applyManualState)
+
+        // 开始动画循环
+        animate()
+
+        // 手动触发加载完成事件
+        loadingManager.onLoad()
+      }
+
+      // 窗口大小调整
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight
+        camera.updateProjectionMatrix()
+        renderer.setSize(window.innerWidth, window.innerHeight)
+      }
+
+      // 重置相机视角
+      function resetCamera() {
+        controls.reset()
+      }
+
+      // 创建魔方
+      function createCube(size) {
+        // 清除现有魔方
+        while (cubeGroup.children.length > 0) {
+          cubeGroup.remove(cubeGroup.children[0])
+        }
+        cubes = []
+
+        const cubeSize = 1
+        const spacing = 0.05
+        const totalSize = size * (cubeSize + spacing) - spacing
+        const offset = totalSize / 2 - cubeSize / 2
+
+        // 创建小方块
+        for (let x = 0; x < size; x++) {
+          for (let y = 0; y < size; y++) {
+            for (let z = 0; z < size; z++) {
+              // 只创建表面的小方块
+              if (x === 0 || x === size - 1 || y === 0 || y === size - 1 || z === 0 || z === size - 1) {
+                const posX = x * (cubeSize + spacing) - offset
+                const posY = y * (cubeSize + spacing) - offset
+                const posZ = z * (cubeSize + spacing) - offset
+
+                const cubelet = createCubelet(cubeSize, x, y, z, size)
+                cubelet.position.set(posX, posY, posZ)
+                cubelet.userData = {
+                  originalPosition: new THREE.Vector3(posX, posY, posZ),
+                  currentPosition: new THREE.Vector3(posX, posY, posZ),
+                  indices: { x, y, z },
+                  size: size,
+                }
+
+                cubeGroup.add(cubelet)
+                cubes.push(cubelet)
+              }
+            }
+          }
+        }
+
+        // 设置UI
+        setupManualInputUI(size)
+        showToast(`已创建${size}阶魔方`)
+      }
+
+      // 创建单个小方块
+      function createCubelet(size, x, y, z, cubeSize) {
+        const geometry = new THREE.BoxGeometry(size, size, size)
+        const materials = []
+
+        // 定义6个面的材质 - 顺序为：前(z+)、后(z-)、上(y+)、下(y-)、右(x+)、左(x-)
+        for (let i = 0; i < 6; i++) {
+          // 默认为黑色（内部面）
+          let color = 0x111111
+
+          // 根据位置确定颜色
+          if (i === 0 && z === cubeSize - 1) {
+            // 前面 (z+)
+            color = faceColors.front
+          } else if (i === 1 && z === 0) {
+            // 后面 (z-)
+            color = faceColors.back
+          } else if (i === 2 && y === cubeSize - 1) {
+            // 上面 (y+)
+            color = faceColors.up
+          } else if (i === 3 && y === 0) {
+            // 下面 (y-)
+            color = faceColors.down
+          } else if (i === 4 && x === cubeSize - 1) {
+            // 右面 (x+)
+            color = faceColors.right
+          } else if (i === 5 && x === 0) {
+            // 左面 (x-)
+            color = faceColors.left
+          }
+
+          const material = new THREE.MeshPhongMaterial({
+            color: color,
+            shininess: 30,
+            specular: 0x222222,
+          })
+
+          materials.push(material)
+        }
+
+        const cubelet = new THREE.Mesh(geometry, materials)
+        cubelet.castShadow = true
+        cubelet.receiveShadow = true
+
+        return cubelet
+      }
+
+      // 鼠标事件处理
+      function onMouseDown(event) {
+        event.preventDefault()
+
+        // 计算鼠标位置
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+        // 射线检测
+        raycaster.setFromCamera(mouse, camera)
+        const intersects = raycaster.intersectObjects(cubes)
+
+        if (intersects.length > 0 && !isAnimating) {
+          controls.enabled = false
+          isDragging = true
+          dragStartPoint.set(mouse.x, mouse.y)
+
+          const intersect = intersects[0]
+          selectedFace = {
+            cube: intersect.object,
+            faceIndex: intersect.faceIndex,
+            normal: intersect.face.normal.clone(),
+          }
+
+          // 转换法线到世界坐标
+          selectedFace.normal.transformDirection(intersect.object.matrixWorld)
+        }
+      }
+
+      function onMouseMove(event) {
+        event.preventDefault()
+
+        if (isDragging && selectedFace) {
+          // 计算鼠标位置
+          mouse.x = (event.clientX / window.innerWidth) * 2 - 1
+          mouse.y = -(event.clientY / window.innerHeight) * 2 + 1
+
+          // 计算拖动距离
+          const dragDelta = new THREE.Vector2(mouse.x - dragStartPoint.x, mouse.y - dragStartPoint.y)
+
+          // 如果拖动距离足够大，执行旋转
+          if (dragDelta.length() > 0.05) {
+            const dragDirection = new THREE.Vector2(Math.sign(dragDelta.x), Math.sign(dragDelta.y))
+
+            // 确定旋转轴和方向
+            const rotationAxis = determineRotationAxis(selectedFace.normal, dragDirection)
+            if (rotationAxis) {
+              // 确定要旋转的层
+              const layer = determineLayer(selectedFace.cube, rotationAxis.axis)
+
+              // 执行旋转
+              rotateLayer(layer, rotationAxis.axis, rotationAxis.direction)
+
+              // 重置拖动状态
+              isDragging = false
+              selectedFace = null
+              controls.enabled = true
+            }
+          }
+        }
+      }
+
+      function onMouseUp(event) {
+        event.preventDefault()
+        isDragging = false
+        selectedFace = null
+        controls.enabled = true
+      }
+
+      // 触摸事件处理
+      function onTouchStart(event) {
+        event.preventDefault()
+
+        if (event.touches.length === 1) {
+          const touch = event.touches[0]
+
+          // 计算触摸位置
+          mouse.x = (touch.clientX / window.innerWidth) * 2 - 1
+          mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1
+
+          // 射线检测
+          raycaster.setFromCamera(mouse, camera)
+          const intersects = raycaster.intersectObjects(cubes)
+
+          if (intersects.length > 0 && !isAnimating) {
+            controls.enabled = false
+            isDragging = true
+            dragStartPoint.set(mouse.x, mouse.y)
+
+            const intersect = intersects[0]
+            selectedFace = {
+              cube: intersect.object,
+              faceIndex: intersect.faceIndex,
+              normal: intersect.face.normal.clone(),
+            }
+
+            // 转换法线到世界坐标
+            selectedFace.normal.transformDirection(intersect.object.matrixWorld)
+          }
+        }
+      }
+
+      function onTouchMove(event) {
+        event.preventDefault()
+
+        if (event.touches.length === 1 && isDragging && selectedFace) {
+          const touch = event.touches[0]
+
+          // 计算触摸位置
+          mouse.x = (touch.clientX / window.innerWidth) * 2 - 1
+          mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1
+
+          // 计算拖动距离
+          const dragDelta = new THREE.Vector2(mouse.x - dragStartPoint.x, mouse.y - dragStartPoint.y)
+
+          // 如果拖动距离足够大，执行旋转
+          if (dragDelta.length() > 0.05) {
+            const dragDirection = new THREE.Vector2(Math.sign(dragDelta.x), Math.sign(dragDelta.y))
+
+            // 确定旋转轴和方向
+            const rotationAxis = determineRotationAxis(selectedFace.normal, dragDirection)
+            if (rotationAxis) {
+              // 确定要旋转的层
+              const layer = determineLayer(selectedFace.cube, rotationAxis.axis)
+
+              // 执行旋转
+              rotateLayer(layer, rotationAxis.axis, rotationAxis.direction)
+
+              // 重置拖动状态
+              isDragging = false
+              selectedFace = null
+              controls.enabled = true
+            }
+          }
+        }
+      }
+
+      function onTouchEnd(event) {
+        isDragging = false
+        selectedFace = null
+        controls.enabled = true
+      }
+
+      // 确定旋转轴和方向
+      function determineRotationAxis(normal, dragDirection) {
+        // 将法线转换为绝对值最大的轴
+        let axis = ''
+        let maxComponent = 0
+
+        if (Math.abs(normal.x) > maxComponent) {
+          maxComponent = Math.abs(normal.x)
+          axis = 'x'
+        }
+
+        if (Math.abs(normal.y) > maxComponent) {
+          maxComponent = Math.abs(normal.y)
+          axis = 'y'
+        }
+
+        if (Math.abs(normal.z) > maxComponent) {
+          maxComponent = Math.abs(normal.z)
+          axis = 'z'
+        }
+
+        // 根据法线和拖动方向确定旋转轴和方向
+        let rotationAxis = ''
+        let direction = 1
+
+        if (axis === 'x') {
+          if (Math.abs(dragDirection.y) > Math.abs(dragDirection.x)) {
+            rotationAxis = 'z'
+            direction = dragDirection.y * Math.sign(normal.x)
+          } else {
+            rotationAxis = 'y'
+            direction = -dragDirection.x * Math.sign(normal.x)
+          }
+        } else if (axis === 'y') {
+          if (Math.abs(dragDirection.x) > Math.abs(dragDirection.y)) {
+            rotationAxis = 'z'
+            direction = -dragDirection.x * Math.sign(normal.y)
+          } else {
+            rotationAxis = 'x'
+            direction = dragDirection.y * Math.sign(normal.y)
+          }
+        } else if (axis === 'z') {
+          if (Math.abs(dragDirection.y) > Math.abs(dragDirection.x)) {
+            rotationAxis = 'x'
+            direction = -dragDirection.y * Math.sign(normal.z)
+          } else {
+            rotationAxis = 'y'
+            direction = -dragDirection.x * Math.sign(normal.z)
+          }
+        }
+
+        return { axis: rotationAxis, direction: direction }
+      }
+
+      // 确定要旋转的层
+      function determineLayer(cube, axis) {
+        const position = cube.position.clone()
+        const size = cube.userData.size
+        const cubeSize = 1
+        const spacing = 0.05
+        const totalSize = size * (cubeSize + spacing) - spacing
+        const threshold = 0.1
+
+        // 根据位置确定层
+        let layerIndex = 0
+
+        if (axis === 'x') {
+          for (let i = 0; i < size; i++) {
+            const layerPos = i * (cubeSize + spacing) - totalSize / 2 + cubeSize / 2
+            if (Math.abs(position.x - layerPos) < threshold) {
+              layerIndex = i
+              break
+            }
+          }
+        } else if (axis === 'y') {
+          for (let i = 0; i < size; i++) {
+            const layerPos = i * (cubeSize + spacing) - totalSize / 2 + cubeSize / 2
+            if (Math.abs(position.y - layerPos) < threshold) {
+              layerIndex = i
+              break
+            }
+          }
+        } else if (axis === 'z') {
+          for (let i = 0; i < size; i++) {
+            const layerPos = i * (cubeSize + spacing) - totalSize / 2 + cubeSize / 2
+            if (Math.abs(position.z - layerPos) < threshold) {
+              layerIndex = i
+              break
+            }
+          }
+        }
+
+        // 获取该层的所有方块
+        return cubes.filter((c) => {
+          const pos = c.position.clone()
+          if (axis === 'x') {
+            return Math.abs(pos.x - position.x) < threshold
+          } else if (axis === 'y') {
+            return Math.abs(pos.y - position.y) < threshold
+          } else if (axis === 'z') {
+            return Math.abs(pos.z - position.z) < threshold
+          }
+        })
+      }
+
+      // 旋转层
+      function rotateLayer(layer, axis, direction) {
+        if (isAnimating || layer.length === 0) return
+
+        isAnimating = true
+
+        // 创建临时组以进行旋转
+        const layerGroup = new THREE.Group()
+        scene.add(layerGroup)
+
+        // 将层中的方块添加到临时组
+        layer.forEach((cube) => {
+          // 保存原始父级和位置
+          cube.userData.originalParent = cube.parent
+          cube.userData.originalPosition = cube.position.clone()
+          cube.userData.originalRotation = cube.rotation.clone()
+
+          // 将世界坐标转换为局部坐标
+          const worldPos = cube.getWorldPosition(new THREE.Vector3())
+          const worldRot = cube.getWorldQuaternion(new THREE.Quaternion())
+
+          // 从原始父级移除
+          cube.userData.originalParent.remove(cube)
+
+          // 添加到临时组并保持世界坐标
+          layerGroup.add(cube)
+          cube.position.copy(worldPos)
+          cube.quaternion.copy(worldRot)
+        })
+
+        // 设置旋转轴
+        let rotationAxis = new THREE.Vector3()
+        if (axis === 'x') rotationAxis.set(1, 0, 0)
+        else if (axis === 'y') rotationAxis.set(0, 1, 0)
+        else if (axis === 'z') rotationAxis.set(0, 0, 1)
+
+        // 旋转角度
+        const targetAngle = direction > 0 ? Math.PI / 2 : -Math.PI / 2
+
+        // 动画参数
+        const duration = 300 // 毫秒
+        const startTime = Date.now()
+
+        // 动画函数
+        function animate() {
+          const elapsedTime = Date.now() - startTime
+          const progress = Math.min(elapsedTime / duration, 1)
+
+          // 使用缓动函数使动画更平滑
+          const easeProgress = easeInOutQuad(progress)
+
+          // 计算当前旋转角度
+          const currentAngle = targetAngle * easeProgress
+
+          // 设置旋转
+          layerGroup.setRotationFromAxisAngle(rotationAxis, currentAngle)
+
+          // 如果动画未完成，继续
+          if (progress < 1) {
+            requestAnimationFrame(animate)
+          } else {
+            // 动画完成，将方块返回到原始父级
+            while (layerGroup.children.length > 0) {
+              const cube = layerGroup.children[0]
+
+              // 获取世界坐标
+              const worldPos = cube.getWorldPosition(new THREE.Vector3())
+              const worldRot = cube.getWorldQuaternion(new THREE.Quaternion())
+
+              // 从临时组移除
+              layerGroup.remove(cube)
+
+              // 添加回原始父级
+              cube.userData.originalParent.add(cube)
+
+              // 设置位置和旋转
+              cube.position.copy(worldPos)
+              cube.quaternion.copy(worldRot)
+
+              // 更精确地四舍五入位置以修正浮点误差
+              cube.position.x = Math.round(cube.position.x * 1000) / 1000
+              cube.position.y = Math.round(cube.position.y * 1000) / 1000
+              cube.position.z = Math.round(cube.position.z * 1000) / 1000
+
+              // 更新当前位置
+              cube.userData.currentPosition = cube.position.clone()
+            }
+
+            // 移除临时组
+            scene.remove(layerGroup)
+
+            // 重置动画状态
+            isAnimating = false
+
+            // 处理动画队列
+            if (animationQueue.length > 0) {
+              const nextAnimation = animationQueue.shift()
+              rotateLayer(nextAnimation.layer, nextAnimation.axis, nextAnimation.direction)
+            }
+
+            // 检查是否已解决
+            if (isCubeSolved()) {
+              showToast('恭喜！魔方已还原！')
+            }
+          }
+        }
+
+        // 开始动画
+        animate()
+      }
+
+      // 缓动函数
+      function easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+      }
+
+      // 打乱魔方
+      function scrambleCube() {
+        if (isAnimating) return
+
+        // 停止任何正在进行的求解
+        stopSolve()
+
+        // 清空动画队列
+        animationQueue = []
+
+        // 随机移动次数
+        const moveCount = 20 + currentSize * 2
+
+        // 生成随机移动
+        for (let i = 0; i < moveCount; i++) {
+          // 随机选择轴和方向
+          const axes = ['x', 'y', 'z']
+          const axis = axes[Math.floor(Math.random() * 3)]
+          const direction = Math.random() > 0.5 ? 1 : -1
+
+          // 随机选择层
+          const layerIndex = Math.floor(Math.random() * currentSize)
+
+          // 获取该层的方块
+          const layer = cubes.filter((cube) => {
+            const pos = cube.position.clone()
+            const size = cube.userData.size
+            const cubeSize = 1
+            const spacing = 0.05
+            const totalSize = size * (cubeSize + spacing) - spacing
+            const layerPos = layerIndex * (cubeSize + spacing) - totalSize / 2 + cubeSize / 2
+
+            if (axis === 'x') {
+              return Math.abs(pos.x - layerPos) < 0.1
+            } else if (axis === 'y') {
+              return Math.abs(pos.y - layerPos) < 0.1
+            } else if (axis === 'z') {
+              return Math.abs(pos.z - layerPos) < 0.1
+            }
+          })
+
+          // 添加到动画队列
+          animationQueue.push({
+            layer: layer,
+            axis: axis,
+            direction: direction,
+          })
+        }
+
+        // 开始执行队列中的第一个动画
+        if (animationQueue.length > 0) {
+          const firstAnimation = animationQueue.shift()
+          rotateLayer(firstAnimation.layer, firstAnimation.axis, firstAnimation.direction)
+        }
+
+        showToast('魔方已打乱')
+      }
+
+      // 重置魔方
+      function resetCube() {
+        if (isAnimating) return
+
+        // 停止任何正在进行的求解
+        stopSolve()
+
+        // 清空动画队列
+        animationQueue = []
+
+        // 重新创建魔方
+        createCube(currentSize)
+
+        showToast('魔方已重置')
+      }
+
+      // 检查魔方是否已解决
+      function isCubeSolved() {
+        // 检查每个面的颜色是否一致
+        const faces = {
+          'x+': [], // 右面 - 材质索引4
+          'x-': [], // 左面 - 材质索引5
+          'y+': [], // 上面 - 材质索引2
+          'y-': [], // 下面 - 材质索引3
+          'z+': [], // 前面 - 材质索引0
+          'z-': [], // 后面 - 材质索引1
+        }
+
+        // 收集每个面的颜色
+        cubes.forEach((cube) => {
+          const pos = cube.position.clone()
+          const size = cube.userData.size
+          const cubeSize = 1
+          const spacing = 0.05
+          const totalSize = size * (cubeSize + spacing) - spacing
+          const threshold = totalSize / 2 - 0.1
+
+          // 检查每个面
+          if (Math.abs(pos.x - threshold) < 0.1) {
+            // 右面 (x+) - 材质索引4
+            faces['x+'].push(cube.material[4].color.getHex())
+          }
+          if (Math.abs(pos.x + threshold) < 0.1) {
+            // 左面 (x-) - 材质索引5
+            faces['x-'].push(cube.material[5].color.getHex())
+          }
+          if (Math.abs(pos.y - threshold) < 0.1) {
+            // 上面 (y+) - 材质索引2
+            faces['y+'].push(cube.material[2].color.getHex())
+          }
+          if (Math.abs(pos.y + threshold) < 0.1) {
+            // 下面 (y-) - 材质索引3
+            faces['y-'].push(cube.material[3].color.getHex())
+          }
+          if (Math.abs(pos.z - threshold) < 0.1) {
+            // 前面 (z+) - 材质索引0
+            faces['z+'].push(cube.material[0].color.getHex())
+          }
+          if (Math.abs(pos.z + threshold) < 0.1) {
+            // 后面 (z-) - 材质索引1
+            faces['z-'].push(cube.material[1].color.getHex())
+          }
+        })
+
+        // 确保每个面都有足够的方块
+        const expectedCubesPerFace = currentSize * currentSize
+        for (const face in faces) {
+          // 如果面上的方块数量不正确，则魔方未还原
+          if (faces[face].length !== expectedCubesPerFace) {
+            return false
+          }
+
+          // 检查每个面的颜色是否一致
+          const firstColor = faces[face][0]
+          for (let i = 1; i < faces[face].length; i++) {
+            if (faces[face][i] !== firstColor) {
+              return false
+            }
+          }
+        }
+
+        return true
+      }
+
+      // 自动求解魔方
+      function solveCube() {
+        if (isAnimating || isSolving) return
+
+        // 设置求解状态
+        isSolving = true
+
+        // 清空动画队列
+        animationQueue = []
+
+        // 获取当前魔方状态
+        const cubeState = getCurrentCubeState()
+
+        // 使用简化的求解算法（这里使用一个简单的示例）
+        // 实际上，完整的魔方求解算法非常复杂，这里只是一个简化版本
+        const solution = simpleSolver(cubeState)
+
+        // 将解法添加到动画队列
+        solution.forEach((move) => {
+          const layer = getCubeLayer(move.face, move.layer)
+          animationQueue.push({
+            layer: layer,
+            axis: move.axis,
+            direction: move.direction,
+          })
+        })
+
+        // 开始执行队列中的第一个动画
+        if (animationQueue.length > 0) {
+          const firstAnimation = animationQueue.shift()
+          rotateLayer(firstAnimation.layer, firstAnimation.axis, firstAnimation.direction)
+        } else {
+          isSolving = false
+        }
+
+        showToast('开始自动还原魔方')
+      }
+
+      // 停止求解
+      function stopSolve() {
+        isSolving = false
+        animationQueue = []
+        showToast('已停止自动还原')
+      }
+
+      // 获取当前魔方状态
+      function getCurrentCubeState() {
+        // 简化版本，实际上需要更复杂的逻辑
+        const state = {
+          front: [], // z+ 面 - 材质索引0
+          back: [], // z- 面 - 材质索引1
+          up: [], // y+ 面 - 材质索引2
+          down: [], // y- 面 - 材质索引3
+          right: [], // x+ 面 - 材质索引4
+          left: [], // x- 面 - 材质索引5
+        }
+
+        // 收集每个面的颜色
+        cubes.forEach((cube) => {
+          const pos = cube.position.clone()
+          const size = cube.userData.size
+          const cubeSize = 1
+          const spacing = 0.05
+          const totalSize = size * (cubeSize + spacing) - spacing
+          const threshold = totalSize / 2 - 0.1
+
+          // 检查每个面
+          if (Math.abs(pos.z - threshold) < 0.1) {
+            // 前面 (z+) - 材质索引0
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            state.front[y * size + x] = cube.material[0].color.getHex()
+          }
+          if (Math.abs(pos.z + threshold) < 0.1) {
+            // 后面 (z-) - 材质索引1
+            const x = Math.round((totalSize / 2 - pos.x) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            state.back[y * size + x] = cube.material[1].color.getHex()
+          }
+          if (Math.abs(pos.y - threshold) < 0.1) {
+            // 上面 (y+) - 材质索引2
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const z = Math.round((pos.z + totalSize / 2) / (cubeSize + spacing))
+            state.up[z * size + x] = cube.material[2].color.getHex()
+          }
+          if (Math.abs(pos.y + threshold) < 0.1) {
+            // 下面 (y-) - 材质索引3
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const z = Math.round((totalSize / 2 - pos.z) / (cubeSize + spacing))
+            state.down[z * size + x] = cube.material[3].color.getHex()
+          }
+          if (Math.abs(pos.x - threshold) < 0.1) {
+            // 右面 (x+) - 材质索引4
+            const z = Math.round((totalSize / 2 - pos.z) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            state.right[y * size + z] = cube.material[4].color.getHex()
+          }
+          if (Math.abs(pos.x + threshold) < 0.1) {
+            // 左面 (x-) - 材质索引5
+            const z = Math.round((pos.z + totalSize / 2) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            state.left[y * size + z] = cube.material[5].color.getHex()
+          }
+        })
+
+        return state
+      }
+
+      // 简化的求解算法（示例）
+      function simpleSolver(state) {
+        // 这只是一个非常简化的示例
+        // 实际的魔方求解算法非常复杂
+
+        // 返回一系列移动
+        const solution = []
+
+        // 对于演示目的，我们只是生成一些随机移动
+        // 在实际应用中，这里应该实现一个真正的魔方求解算法
+        const faces = ['front', 'back', 'up', 'down', 'right', 'left']
+        const axes = ['x', 'y', 'z']
+
+        // 生成一些随机移动
+        for (let i = 0; i < 20; i++) {
+          const face = faces[Math.floor(Math.random() * faces.length)]
+          const axis = axes[Math.floor(Math.random() * axes.length)]
+          const direction = Math.random() > 0.5 ? 1 : -1
+          const layer = Math.floor(Math.random() * currentSize)
+
+          solution.push({
+            face: face,
+            axis: axis,
+            direction: direction,
+            layer: layer,
+          })
+        }
+
+        return solution
+      }
+
+      // 获取魔方层
+      function getCubeLayer(face, layerIndex) {
+        const size = currentSize
+        const cubeSize = 1
+        const spacing = 0.05
+        const totalSize = size * (cubeSize + spacing) - spacing
+        const layerPos = layerIndex * (cubeSize + spacing) - totalSize / 2 + cubeSize / 2
+
+        // 根据面和层索引获取方块
+        return cubes.filter((cube) => {
+          const pos = cube.position.clone()
+
+          if (face === 'front') {
+            return Math.abs(pos.z - layerPos) < 0.1
+          } else if (face === 'back') {
+            return Math.abs(pos.z + layerPos) < 0.1
+          } else if (face === 'up') {
+            return Math.abs(pos.y - layerPos) < 0.1
+          } else if (face === 'down') {
+            return Math.abs(pos.y + layerPos) < 0.1
+          } else if (face === 'right') {
+            return Math.abs(pos.x - layerPos) < 0.1
+          } else if (face === 'left') {
+            return Math.abs(pos.x + layerPos) < 0.1
+          }
+
+          return false
+        })
+      }
+
+      // 设置手动输入UI
+      function setupManualInputUI(size) {
+        const container = document.getElementById('manual-input-tabs')
+        container.innerHTML = ''
+
+        // 为每个面创建输入界面
+        cubeFaces.forEach((face) => {
+          const faceDiv = document.createElement('div')
+          faceDiv.className = 'face-input'
+          faceDiv.innerHTML = `<h3>${getFaceName(face)}</h3>`
+
+          const gridDiv = document.createElement('div')
+          gridDiv.className = 'cube-state-input'
+          gridDiv.style.gridTemplateColumns = `repeat(${size}, 1fr)`
+          gridDiv.style.gridTemplateRows = `repeat(${size}, 1fr)`
+
+          // 创建颜色选择器
+          for (let i = 0; i < size * size; i++) {
+            const colorSelector = document.createElement('div')
+            colorSelector.className = 'color-selector'
+            colorSelector.style.backgroundColor = '#' + faceColors[face].toString(16).padStart(6, '0')
+            colorSelector.dataset.face = face
+            colorSelector.dataset.index = i
+
+            // 点击切换颜色
+            colorSelector.addEventListener('click', function () {
+              const currentColor = this.style.backgroundColor
+              const colorKeys = Object.keys(faceColors)
+              let currentIndex = -1
+
+              // 找到当前颜色的索引
+              for (let j = 0; j < colorKeys.length; j++) {
+                const hexColor = '#' + faceColors[colorKeys[j]].toString(16).padStart(6, '0')
+                if (currentColor === hexColor) {
+                  currentIndex = j
+                  break
+                }
+              }
+
+              // 切换到下一个颜色
+              const nextIndex = (currentIndex + 1) % colorKeys.length
+              const nextColor = faceColors[colorKeys[nextIndex]]
+              this.style.backgroundColor = '#' + nextColor.toString(16).padStart(6, '0')
+            })
+
+            gridDiv.appendChild(colorSelector)
+          }
+
+          faceDiv.appendChild(gridDiv)
+          container.appendChild(faceDiv)
+        })
+      }
+
+      // 获取面的名称
+      function getFaceName(face) {
+        const names = {
+          front: '前面',
+          back: '后面',
+          up: '上面',
+          down: '下面',
+          right: '右面',
+          left: '左面',
+        }
+
+        return names[face] || face
+      }
+
+      // 应用手动输入的状态
+      function applyManualState() {
+        // 获取手动输入的状态
+        const manualState = {}
+
+        cubeFaces.forEach((face) => {
+          manualState[face] = []
+          const selectors = document.querySelectorAll(`.color-selector[data-face="${face}"]`)
+
+          selectors.forEach((selector) => {
+            const color = selector.style.backgroundColor
+            const hexColor = rgbToHex(color)
+            manualState[face].push(parseInt(hexColor.substring(1), 16))
+          })
+        })
+
+        // 应用状态到魔方
+        applyStateToRubiksCube(manualState)
+
+        showToast('已应用手动输入的状态')
+      }
+
+      // 将RGB颜色转换为十六进制
+      function rgbToHex(rgb) {
+        // 从 "rgb(r, g, b)" 格式中提取 r, g, b 值
+        const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/)
+        if (match) {
+          const r = parseInt(match[1])
+          const g = parseInt(match[2])
+          const b = parseInt(match[3])
+          return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+        }
+
+        // 如果已经是十六进制格式，直接返回
+        return rgb
+      }
+
+      // 将状态应用到魔方
+      function applyStateToRubiksCube(state) {
+        // 这是一个简化版本，实际上需要更复杂的逻辑
+
+        // 重置魔方
+        resetCube()
+
+        // 应用状态
+        cubes.forEach((cube) => {
+          const pos = cube.position.clone()
+          const size = cube.userData.size
+          const cubeSize = 1
+          const spacing = 0.05
+          const totalSize = size * (cubeSize + spacing) - spacing
+          const threshold = totalSize / 2 - 0.1
+
+          // 检查每个面
+          if (Math.abs(pos.z - threshold) < 0.1) {
+            // 前面
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            const index = y * size + x
+            if (state.front[index] !== undefined) {
+              cube.material[0].color.setHex(state.front[index])
+            }
+          }
+          if (Math.abs(pos.z + threshold) < 0.1) {
+            // 后面
+            const x = Math.round((totalSize / 2 - pos.x) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            const index = y * size + x
+            if (state.back[index] !== undefined) {
+              cube.material[1].color.setHex(state.back[index])
+            }
+          }
+          if (Math.abs(pos.y - threshold) < 0.1) {
+            // 上面
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const z = Math.round((pos.z + totalSize / 2) / (cubeSize + spacing))
+            const index = z * size + x
+            if (state.up[index] !== undefined) {
+              cube.material[2].color.setHex(state.up[index])
+            }
+          }
+          if (Math.abs(pos.y + threshold) < 0.1) {
+            // 下面
+            const x = Math.round((pos.x + totalSize / 2) / (cubeSize + spacing))
+            const z = Math.round((totalSize / 2 - pos.z) / (cubeSize + spacing))
+            const index = z * size + x
+            if (state.down[index] !== undefined) {
+              cube.material[3].color.setHex(state.down[index])
+            }
+          }
+          if (Math.abs(pos.x - threshold) < 0.1) {
+            // 右面
+            const z = Math.round((totalSize / 2 - pos.z) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            const index = y * size + z
+            if (state.right[index] !== undefined) {
+              cube.material[4].color.setHex(state.right[index])
+            }
+          }
+          if (Math.abs(pos.x + threshold) < 0.1) {
+            // 左面
+            const z = Math.round((pos.z + totalSize / 2) / (cubeSize + spacing))
+            const y = Math.round((totalSize / 2 - pos.y) / (cubeSize + spacing))
+            const index = y * size + z
+            if (state.left[index] !== undefined) {
+              cube.material[5].color.setHex(state.left[index])
+            }
+          }
+        })
+      }
+
+      // 显示提示信息
+      function showToast(message) {
+        const toast = document.getElementById('toast')
+        toast.textContent = message
+        toast.style.opacity = '1'
+
+        setTimeout(() => {
+          toast.style.opacity = '0'
+        }, 2000)
+      }
+
+      // 动画循环
+      function animate() {
+        requestAnimationFrame(animate)
+        controls.update()
+        stats.update()
+        renderer.render(scene, camera)
+      }
+
+      // 初始化应用
+      init()
+    </script>
+  </body>
+</html>

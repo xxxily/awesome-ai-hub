@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- Ensure proper viewport scaling and prevent accidental zooming on mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Web3D 魔方 V2</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #222; color: #eee; display: flex; flex-direction: column; height: 100vh; }
+        #container { flex-grow: 1; position: relative; }
+        canvas { display: block; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.75);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Reduced gap slightly */
+            max-width: 220px; /* Adjusted width */
+            max-height: calc(100vh - 40px); /* Limit height */
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out; /* Smooth collapse */
+            overflow: hidden; /* Needed for collapse */
+            z-index: 5; /* Ensure controls are above canvas but below panel */
+        }
+        #controls.collapsed {
+            max-height: 35px; /* Height of the toggle button */
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+         #controls h4 { margin: 5px 0; text-align: center; }
+         #controls label, #controls button, #controls input, #controls select {
+            display: block;
+            margin-bottom: 5px;
+            width: 100%;
+            box-sizing: border-box;
+         }
+        #controls button {
+            padding: 8px 10px;
+            background-color: #448aff;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 0.9em;
+        }
+        #controls button:hover { background-color: #2962ff; }
+        #controls button:disabled { background-color: #555; cursor: not-allowed; opacity: 0.6; }
+         #toggleControlsBtn {
+             background-color: #666;
+             margin-bottom: 10px; /* Space when expanded */
+             font-weight: bold;
+         }
+         #controls.collapsed #toggleControlsBtn { margin-bottom: 0; }
+         #controlsContent {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow: hidden; /* Ensure content is clipped */
+            transition: opacity 0.3s ease-out;
+         }
+         #controls.collapsed #controlsContent {
+             opacity: 0;
+             height: 0;
+         }
+        #controls input[type="range"] { width: calc(100% - 45px); margin-left: 5px; vertical-align: middle;}
+         #controls .range-container span { font-size: 0.85em; vertical-align: middle; display: inline-block; width: 35px; text-align: right;}
+        #controls select, #controls input[type="number"] { padding: 6px; border-radius: 4px; border: 1px solid #555; background: #333; color: #eee; font-size: 0.9em;}
+         #controls .info-text { font-size: 0.8em; margin-top: 5px; color: #ccc; line-height: 1.4;}
+
+        /* Manual Input Panel */
+        #manualInputPanel {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10;
+            border: 1px solid #444;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+        }
+        #manualInputPanel h3 { margin-top: 0; text-align: center; }
+        .face-grid { display: grid; gap: 2px; margin-bottom: 10px; }
+        .facelet { width: 30px; height: 30px; border: 1px solid #555; cursor: pointer; display: inline-block; text-align: center; line-height: 30px; font-weight: bold; transition: transform 0.1s ease-out; }
+        .facelet:hover { transform: scale(1.1); }
+        .color-picker { margin-top: 15px; text-align: center; }
+        .color-picker .facelet { cursor: default; transform: none; } /* No hover effect on picker itself */
+        .color-btn { padding: 5px 10px; margin: 0 3px; border-radius: 4px; border: 2px solid transparent; cursor: pointer; font-weight: bold; }
+         .color-btn.selected { border-color: #fff; } /* Indicate selected color */
+
+        /* Loading/Status Indicator */
+        #status {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            z-index: 5;
+            display: none; /* Hidden initially */
+            transition: opacity 0.3s ease-out;
+         }
+         #status.show { display: block; opacity: 1;}
+         #status.hide { opacity: 0; }
+
+         /* Responsive adjustments */
+         @media (max-width: 767px) { /* Adjusted breakpoint for mobile panel collapse */
+            #controls { max-width: 180px; padding: 8px 10px; }
+            #controls button { padding: 7px 8px; font-size: 0.85em; }
+            .facelet { width: 25px; height: 25px; line-height: 25px; font-size: 0.8em;}
+            #manualInputPanel { padding: 15px; }
+            #controls input[type="range"] { width: calc(100% - 40px); }
+            #controls .range-container span { width: 30px; }
+         }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <div id="controls">
+            <button id="toggleControlsBtn">收起</button>
+            <div id="controlsContent">
+                <h4>魔方控制</h4>
+                <label for="orderSelect">阶数 (仅3阶支持还原):</label>
+                <select id="orderSelect">
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20">20</option>
+                    <!-- Note: High orders WILL be slow -->
+                </select>
+                <button id="generateBtn">生成/重置</button>
+                <button id="scrambleBtn">打乱魔方</button>
+                <button id="solveBtn" disabled>自动还原 (仅3阶)</button>
+                <label for="solveSpeed">还原速度:</label>
+                <div class="range-container">
+                     <input type="range" id="solveSpeed" min="50" max="1000" value="300" step="50">
+                     <span>300ms</span>
+                </div>
+                <button id="manualInputBtn" disabled>手动录入 (仅3阶)</button>
+                <button id="cancelManualInputBtn" style="display:none; background-color: #ff5252;">取消录入</button>
+
+                <div class="info-text">
+                    <b>操作:</b><br/>
+                    拖拽空白: 旋转视角<br/>
+                    拖拽方块: 旋转层面
+                </div>
+            </div>
+        </div>
+         <div id="status">准备就绪</div>
+    </div>
+
+    <div id="manualInputPanel">
+        <h3>手动录入魔方面状态 (3阶)</h3>
+        <p style="font-size:0.8em; text-align:center;">点击下方色块选择颜色，然后点击对应位置。请严格按照标准配色输入。</p>
+        <div id="manualInputGrids">
+            <!-- Grids will be generated here -->
+        </div>
+        <div class="color-picker">
+            当前颜色: <span id="currentColor" class="facelet" style="background-color: white;">W</span> <br/><br/>
+            <button class="color-btn selected" data-color="white" style="background-color: white; color: black;">W</button>
+            <button class="color-btn" data-color="yellow" style="background-color: yellow; color: black;">Y</button>
+            <button class="color-btn" data-color="blue" style="background-color: blue; color: white;">B</button>
+            <button class="color-btn" data-color="green" style="background-color: green; color: white;">G</button>
+            <button class="color-btn" data-color="red" style="background-color: red; color: white;">R</button>
+            <button class="color-btn" data-color="orange" style="background-color: orange; color: black;">O</button>
+        </div>
+        <div style="text-align: center; margin-top: 20px; display: flex; justify-content: space-around;">
+             <button id="applyManualInputBtn">应用状态</button>
+             <button id="closeManualInputBtn" style="background-color:#aaa">关闭</button>
+        </div>
+    </div>
+
+    <!-- Import maps for ES6 module imports -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "@tweenjs/tween.js": "https://unpkg.com/@tweenjs/tween.js@21.0.0/dist/tween.esm.js",
+            "rubiks-cube-solver": "https://cdn.jsdelivr.net/npm/rubiks-cube-solver@1.2.0/+esm"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import TWEEN from '@tweenjs/tween.js';
+        // Import as namespace to handle potential default export issues with ESM CDNs
+        import * as Solver from 'rubiks-cube-solver';
+        const solveCube = Solver.default; // Access the default export
+
+        // --- Global Variables ---
+        let scene, camera, renderer, controls;
+        let cubeGroup;
+        let cubies = [];
+        let order = 3;
+        const cubieSize = 1;
+        const gap = 0.05;
+
+        let isAnimating = false; // Consolidated flag for any animation (rotation, solve, scramble)
+        let isDragging = false;
+        let isSolving = false; // Specific flag for solver process
+        let isScrambling = false; // Specific flag for scrambling process
+
+        let dragStart = { x: 0, y: 0 };
+        let selectedCubie = null;
+        let selectedFaceNormal = null;
+        let selectedAxis = null;
+        let rotationPivot;
+
+        let solveSpeed = 300;
+        let solverInterval = null;
+        let statusTimeout = null; // For hiding status messages
+
+        // Consistent Color Definitions (Orange opposite Red, Yellow opposite White, Green opposite Blue)
+        const faceColors = {
+            R: 0xff5722, // Red (+X)
+            L: 0xffa726, // Orange (-X) -> Changed for better contrast
+            U: 0xffffff, // White (+Y)
+            D: 0xffff00, // Yellow (-Y)
+            F: 0x2196f3, // Blue (+Z)
+            B: 0x4caf50, // Green (-Z)
+            inner: 0x333333
+        };
+        const colorMap = {
+            'R': faceColors.R, 'L': faceColors.L, 'U': faceColors.U,
+            'D': faceColors.D, 'F': faceColors.F, 'B': faceColors.B
+        };
+        const faceChars = {
+            [faceColors.R]: 'R', [faceColors.L]: 'L', [faceColors.U]: 'U',
+            [faceColors.D]: 'D', [faceColors.F]: 'F', [faceColors.B]: 'B'
+        };
+        const faceNormalsMap = {
+            '1,0,0': 'R', '-1,0,0': 'L',
+            '0,1,0': 'U', '0,-1,0': 'D',
+            '0,0,1': 'F', '0,0,-1': 'B'
+        };
+
+        // Manual Input related
+        let manualInputMode = false;
+        let currentManualColor = 'white';
+        let manualInputState = {};
+
+        const statusElement = document.getElementById('status');
+        const controlsElement = document.getElementById('controls');
+        const toggleControlsBtn = document.getElementById('toggleControlsBtn');
+        const controlsContent = document.getElementById('controlsContent');
+
+        // --- Initialization ---
+        function init() {
+            // Basic check for WebGL
+            if (!window.WebGLRenderingContext) {
+                alert("抱歉，您的浏览器不支持Web3D (WebGL)，无法运行此魔方。");
+                return;
+            }
+            // Check solver import
+             if (typeof solveCube !== 'function') {
+                 console.error("Rubik's Cube Solver library failed to load correctly!");
+                 alert("错误：未能加载魔方求解器库。自动还原功能将不可用。");
+                 // Optionally disable solve button permanently here
+            }
+
+
+            const container = document.getElementById('container');
+            const canvas = document.getElementById('canvas');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x222222);
+
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false }); // alpha:false potentially faster
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            // renderer.outputEncoding = THREE.sRGBEncoding; // Consider for more accurate colors if needed
+
+            // Enhanced Lighting
+            scene.add(new THREE.AmbientLight(0x888888)); // Slightly brighter ambient
+            const light1 = new THREE.DirectionalLight(0xffffff, 1.2);
+            light1.position.set(1, 1.5, 1).normalize();
+            scene.add(light1);
+            const light2 = new THREE.DirectionalLight(0xffffff, 0.8);
+            light2.position.set(-1, -1.5, -1).normalize();
+            scene.add(light2);
+             const light3 = new THREE.DirectionalLight(0xffffff, 0.5);
+             light3.position.set(0, 1, -1).normalize(); // Add some back/top light
+             scene.add(light3);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enablePan = false;
+            controls.enableZoom = true;
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.rotateSpeed = 0.7; // Slightly adjust speed
+
+             // Event listener to re-enable interaction after camera move finishes
+             controls.addEventListener('end', () => {
+                 // Only re-enable if no cube animation is planned or running
+                 if (!isAnimating && !isDragging) {
+                     // console.log("OrbitControls end, enabling interaction listeners");
+                     enableInteraction();
+                 }
+             });
+             controls.addEventListener('start', () => {
+                 // Disable cube interaction while actively panning/zooming/rotating camera
+                 // console.log("OrbitControls start, disabling interaction listeners");
+                 disableInteraction(false); // Don't force flag change
+             });
+
+
+            rotationPivot = new THREE.Group();
+            scene.add(rotationPivot);
+
+            // Initial Cube Generation
+             const initialOrder = parseInt(document.getElementById('orderSelect').value) || 3;
+            createCube(initialOrder); // Create initial cube *after* setting up controls
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+             // Use container for listeners to avoid issues with canvas overlap
+            container.addEventListener('pointerdown', onPointerDown, { passive: false }); // passive:false needed to prevent scrolling on touch sometimes
+            container.addEventListener('pointermove', onPointerMove, { passive: false });
+            container.addEventListener('pointerup', onPointerUp, false);
+            container.addEventListener('pointerleave', onPointerLeave, false); // Handle leaving the canvas
+            container.addEventListener('pointercancel', onPointerUp, false); // Treat cancel like up
+
+            setupUI();
+            updateStatus("准备就绪", 3000);
+            animate();
+        }
+
+        // --- Cube Creation ---
+        function createCube(n) {
+             if (n < 3) {
+                 n = 3;
+                 document.getElementById('orderSelect').value = "3";
+                 updateStatus("阶数最小为 3", 3000);
+             }
+             if (n > 20) {
+                  n = 20;
+                 document.getElementById('orderSelect').value = "20";
+                 updateStatus("阶数最大为 20", 3000);
+             }
+             if (n > 10) {
+                 updateStatus(`正在生成 ${n} 阶魔方 (可能较慢)...`, 0); // Persistent message
+             } else {
+                  updateStatus(`生成 ${n} 阶魔方...`, 1000);
+             }
+
+
+             order = n;
+             cubies = [];
+             if (cubeGroup) {
+                // Proper disposal
+                while(cubeGroup.children.length > 0){
+                    const obj = cubeGroup.children[0];
+                    cubeGroup.remove(obj);
+                    if (obj.geometry) obj.geometry.dispose();
+                    if (obj.material) {
+                        if (Array.isArray(obj.material)) {
+                            obj.material.forEach(m => m.dispose());
+                        } else {
+                            obj.material.dispose();
+                        }
+                    }
+                }
+                scene.remove(cubeGroup);
+            }
+             cubeGroup = new THREE.Group();
+             scene.add(cubeGroup);
+
+             // Use BufferGeometry for potentially better performance with many cubes
+             const size = cubieSize - gap;
+             const geometry = new THREE.BoxGeometry(size, size, size);
+
+             // Pre-create materials
+             const materialsCache = {};
+             for (const key in faceColors) {
+                 materialsCache[faceColors[key]] = new THREE.MeshStandardMaterial({
+                     color: faceColors[key],
+                     roughness: 0.7,
+                     metalness: 0.1
+                 });
+             }
+
+             const offset = (order - 1) / 2;
+
+             // Function to create a single cubie instance
+             const createCubieInstance = (x, y, z) => {
+                const materials = [];
+                materials.push((x === offset) ? materialsCache[faceColors.R] : materialsCache[faceColors.inner]); // Right
+                materials.push((x === -offset) ? materialsCache[faceColors.L] : materialsCache[faceColors.inner]); // Left
+                materials.push((y === offset) ? materialsCache[faceColors.U] : materialsCache[faceColors.inner]); // Up
+                materials.push((y === -offset) ? materialsCache[faceColors.D] : materialsCache[faceColors.inner]); // Down
+                materials.push((z === offset) ? materialsCache[faceColors.F] : materialsCache[faceColors.inner]); // Front
+                materials.push((z === -offset) ? materialsCache[faceColors.B] : materialsCache[faceColors.inner]); // Back
+
+                const cubieMesh = new THREE.Mesh(geometry, materials); // Use shared geometry, unique materials array
+                cubieMesh.position.set(x * cubieSize, y * cubieSize, z * cubieSize);
+                cubieMesh.userData = { logicalX: x, logicalY: y, logicalZ: z, initialX: x, initialY: y, initialZ: z, isCubie: true };
+                return cubieMesh;
+             };
+
+
+             // Timeout to allow status update rendering before potential blocking loop
+             setTimeout(() => {
+                const offset = (order - 1) / 2;
+                for (let i = 0; i < order; i++) {
+                    for (let j = 0; j < order; j++) {
+                        for (let k = 0; k < order; k++) {
+                            const isShell = (i === 0 || i === order - 1 || j === 0 || j === order - 1 || k === 0 || k === order - 1);
+                            if (!isShell && order > 2) continue; // Skip inner pieces efficiently
+
+                            const x = i - offset;
+                            const y = j - offset;
+                            const z = k - offset;
+                            const cubie = createCubieInstance(x, y, z);
+                            cubeGroup.add(cubie);
+                            cubies.push(cubie);
+                        }
+                    }
+                }
+
+                // Adjust camera and controls after cube generation
+                const cubeDiagonal = Math.sqrt(3 * Math.pow(order * cubieSize, 2)); // Diagonal of the whole cube
+                const camDistance = cubeDiagonal * 1.2; // Distance based on diagonal
+                camera.position.set(1, 1, 1).normalize().multiplyScalar(camDistance); // Maintain direction
+                camera.lookAt(scene.position);
+                controls.target.set(0, 0, 0); // Ensure target is cube center
+                controls.minDistance = order * cubieSize * 0.8; // Allow closer zoom
+                controls.maxDistance = camDistance * 2.5; // Further zoom out
+                controls.update();
+
+                resetSolverState(); // Reset flags, button states
+                enableInteraction();
+
+                if (n > 10) {
+                    updateStatus(`${n} 阶魔方生成完毕`, 3000);
+                } else {
+                     updateStatus(`准备就绪`, 3000);
+                }
+             }, 50); // Short delay
+        }
+
+        // --- Interaction Logic ---
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        function getIntersectedObject(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(pointer, camera);
+            // Important: Only intersect with the cubies in the cubeGroup
+            const intersects = raycaster.intersectObjects(cubeGroup.children, false); // non-recursive
+
+            for (const intersect of intersects) {
+                if (intersect.object.userData.isCubie) {
+                    return intersect;
+                }
+            }
+            return null;
+        }
+
+        function onPointerDown(event) {
+            // Allow interaction only if no animation is running and not currently dragging
+            if (isAnimating || isDragging) return;
+             // If OrbitControls is active (user is rotating view), don't start cube drag
+             // This check might be redundant due to controls.addEventListener('start/end') but adds safety
+             // A better check might be needed if OrbitControls doesn't preventDefault reliably
+            // if (controls.state !== -1) return; // OrbitControls internal state check (may be brittle)
+
+
+            const intersect = getIntersectedObject(event);
+
+            if (intersect && intersect.face) { // Ensure face is available
+                // Auto-collapse controls on mobile when interaction starts
+                if (window.innerWidth < 768 && !controlsElement.classList.contains('collapsed')) {
+                    toggleControls(true); // Force collapse
+                }
+
+                // disableInteraction(); // Disable OrbitControls via flag/method if needed
+                controls.enabled = false; // Disable OrbitControls directly
+                isDragging = true;
+                dragStart.x = event.clientX;
+                dragStart.y = event.clientY;
+                selectedCubie = intersect.object;
+                selectedFaceNormal = intersect.face.normal.clone();
+                selectedFaceNormal.transformDirection(selectedCubie.matrixWorld).round(); // Transform to world
+
+                // Prevent browser default actions like text selection or scrolling on touch drag
+                 if (event.cancelable) event.preventDefault();
+
+
+            } else {
+                 // Clicked empty space - OrbitControls should handle this
+                 resetDragState(); // Ensure any previous drag state is cleared
+                 // controls.enabled = true; // OrbitControls takes over
+            }
+        }
+
+        function onPointerMove(event) {
+             if (!isDragging || !selectedCubie || isAnimating) return;
+
+              // Prevent browser default actions during drag
+             if (event.cancelable) event.preventDefault();
+
+
+            const currentX = event.clientX;
+            const currentY = event.clientY;
+            const deltaX = currentX - dragStart.x;
+            const deltaY = currentY - dragStart.y;
+
+            // Increased threshold for initiating rotation
+            if (Math.abs(deltaX) > 15 || Math.abs(deltaY) > 15) {
+                 determineRotationAxisAndLayer(deltaX, deltaY);
+                 if (selectedAxis) {
+                    const direction = determineRotationDirection(deltaX, deltaY);
+                    // Start rotation - set isAnimating flag
+                    isAnimating = true;
+                    updateStatus(`旋转中...`, 0); // Persistent status
+                    rotateLayer(selectedAxis.axis, selectedAxis.layerIndex, direction);
+                    // Rotation started, stop drag processing for this interaction
+                    isDragging = false;
+                    // Keep OrbitControls disabled until animation finishes
+                 } else {
+                    // Couldn't determine axis, reset but keep OrbitControls disabled until pointerup
+                    // isDragging = false; // Keep dragging true until pointer up? Or reset? Let's reset.
+                     resetDragState(); // Reset fully if axis fails
+                 }
+                 // Update start position to prevent re-triggering immediately if axis failed
+                 dragStart.x = currentX;
+                 dragStart.y = currentY;
+            }
+        }
+
+        function onPointerUp(event) {
+            if (isDragging) {
+                 // If dragging flag is still true here, it means a rotation wasn't triggered
+                 // We need to re-enable controls
+                controls.enabled = true;
+                 enableInteraction(); // Re-enable listeners if needed
+            }
+             // Always reset drag state on pointer up/cancel/leave
+            resetDragState();
+        }
+
+        function onPointerLeave(event) {
+            // If pointer leaves canvas while dragging, treat it as pointer up
+            if (isDragging) {
+                 // console.log("Pointer left while dragging");
+                 controls.enabled = true;
+                 enableInteraction();
+            }
+            resetDragState();
+        }
+
+        function resetDragState() {
+             isDragging = false;
+             selectedCubie = null;
+             selectedFaceNormal = null;
+             selectedAxis = null;
+             // Re-enable OrbitControls ONLY if no animation is running
+             if (!isAnimating) {
+                 controls.enabled = true;
+                 enableInteraction(); // Ensure listeners are active
+                 // Update status only if not solving/scrambling
+                 if (!isSolving && !isScrambling) {
+                     updateStatus("准备就绪", 2000);
+                 }
+             }
+            // console.log("Drag state reset. isAnimating:", isAnimating, "Controls enabled:", controls.enabled);
+        }
+
+         // Placeholder functions for enabling/disabling interaction listeners if needed
+         // Currently relying on OrbitControls 'start'/'end' and isAnimating flag
+         function enableInteraction() {
+             // console.log("Interaction Enabled");
+             // container.addEventListener('pointerdown', onPointerDown, { passive: false });
+             // container.addEventListener('pointermove', onPointerMove, { passive: false });
+         }
+         function disableInteraction(setAnimatingFlag = true) {
+            if (setAnimatingFlag) isAnimating = true; // Assume disabling means animation starts
+             // console.log("Interaction Disabled");
+             // container.removeEventListener('pointerdown', onPointerDown);
+             // container.removeEventListener('pointermove', onPointerMove);
+             resetDragState(); // Ensure drag state is cleared when interaction is disabled externally
+         }
+
+
+        // --- Rotation Axis/Direction Logic (Largely unchanged, but added logging) ---
+        function determineRotationAxisAndLayer(deltaX, deltaY) {
+             if (!selectedFaceNormal || !selectedCubie) return;
+             // console.log("Determining Axis: deltaX:", deltaX, "deltaY:", deltaY, "FaceNormal:", selectedFaceNormal);
+
+             const viewDirection = camera.position.clone().sub(controls.target).normalize();
+             // Ensure camera.up is orthogonal to viewDirection for stability
+             let cameraUp = camera.up.clone();
+             if (Math.abs(cameraUp.dot(viewDirection)) > 0.99) { // If looking straight up or down
+                 cameraUp.set(0, 0, camera.position.y > 0 ? -1 : 1); // Use Z-axis
+             }
+             const cameraRight = new THREE.Vector3().crossVectors(viewDirection, cameraUp).normalize();
+             cameraUp.crossVectors(cameraRight, viewDirection).normalize(); // Recalculate Up
+
+
+             let planeAxis1 = new THREE.Vector3();
+             let planeAxis2 = new THREE.Vector3();
+             if (Math.abs(selectedFaceNormal.x) > 0.9) { planeAxis1.set(0, 1, 0); planeAxis2.set(0, 0, 1); } // R/L face -> Y, Z axes
+             else if (Math.abs(selectedFaceNormal.y) > 0.9) { planeAxis1.set(1, 0, 0); planeAxis2.set(0, 0, 1); } // U/D face -> X, Z axes
+             else { planeAxis1.set(1, 0, 0); planeAxis2.set(0, 1, 0); } // F/B face -> X, Y axes
+
+             // Project camera axes onto the plane axes to find the world drag direction on the plane
+             const dragOnPlane = new THREE.Vector3();
+             dragOnPlane.addScaledVector(planeAxis1, cameraRight.dot(planeAxis1) * deltaX + cameraUp.dot(planeAxis1) * -deltaY);
+             dragOnPlane.addScaledVector(planeAxis2, cameraRight.dot(planeAxis2) * deltaX + cameraUp.dot(planeAxis2) * -deltaY);
+             dragOnPlane.normalize();
+
+             // Rotation axis is perpendicular to face normal and drag direction on plane
+             let rotationAxis = new THREE.Vector3().crossVectors(selectedFaceNormal, dragOnPlane).round();
+             // console.log("DragOnPlane:", dragOnPlane, "RotationAxis Raw:", rotationAxis);
+
+             // Find dominant component
+             let maxVal = 0; let axis = null;
+             if (Math.abs(rotationAxis.x) > maxVal) { maxVal = Math.abs(rotationAxis.x); axis = 'x'; }
+             if (Math.abs(rotationAxis.y) > maxVal) { maxVal = Math.abs(rotationAxis.y); axis = 'y'; }
+             if (Math.abs(rotationAxis.z) > maxVal) { maxVal = Math.abs(rotationAxis.z); axis = 'z'; }
+
+             if (!axis) {
+                  // console.warn("Could not determine dominant rotation axis.");
+                  selectedAxis = null;
+                  return;
+             }
+
+             let layerIndex;
+             if (axis === 'x') layerIndex = selectedCubie.userData.logicalX;
+             else if (axis === 'y') layerIndex = selectedCubie.userData.logicalY;
+             else layerIndex = selectedCubie.userData.logicalZ;
+
+             selectedAxis = { axis, layerIndex };
+             // console.log("Determined Axis:", axis, "Layer:", layerIndex);
+         }
+
+         function determineRotationDirection(deltaX, deltaY) {
+             if (!selectedAxis || !selectedFaceNormal) return 1;
+
+             const axisVec = new THREE.Vector3();
+             if (selectedAxis.axis === 'x') axisVec.set(1, 0, 0);
+             else if (selectedAxis.axis === 'y') axisVec.set(0, 1, 0);
+             else axisVec.set(0, 0, 1);
+
+             // Direction on face (perpendicular to axis and normal)
+             const faceDragDirection = new THREE.Vector3().crossVectors(axisVec, selectedFaceNormal);
+
+             // Approx world drag vector from screen drag
+             const viewDirection = camera.position.clone().sub(controls.target).normalize();
+             let cameraUp = camera.up.clone();
+              if (Math.abs(cameraUp.dot(viewDirection)) > 0.99) {
+                 cameraUp.set(0, 0, camera.position.y > 0 ? -1 : 1);
+             }
+             const cameraRight = new THREE.Vector3().crossVectors(viewDirection, cameraUp).normalize();
+             cameraUp.crossVectors(cameraRight, viewDirection).normalize();
+
+             const worldDragApprox = new THREE.Vector3()
+                 .addScaledVector(cameraRight, deltaX)
+                 .addScaledVector(cameraUp, -deltaY)
+                 .normalize();
+
+             const dot = worldDragApprox.dot(faceDragDirection);
+
+             // Determine direction (+1 or -1) based on dot product and axis/normal combination
+             // This heuristic seems reasonably stable, but might need axis-specific tuning if issues persist
+              let direction = (dot > 0) ? 1 : -1;
+
+             // Flip direction based on axis/normal view convention if needed (empirical adjustment)
+             // E.g., Rotating Y axis, looking at +Y face, positive dot might mean counter-clockwise from that view
+             // Let's test the current simple version first. Needs systematic testing.
+
+             // console.log("Determined Direction:", direction > 0 ? "+90" : "-90", "Dot:", dot);
+             return direction;
+         }
+
+        function onWindowResize() {
+            const container = document.getElementById('container');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            // Only update controls if damping is enabled OR if interaction requires it
+            if (controls.enableDamping) {
+                controls.update();
+            }
+            renderer.render(scene, camera);
+        }
+
+        // --- Rotation Logic ---
+        function rotateLayer(axis, layerIndex, direction, duration = solveSpeed) {
+             // Allow rotation if called specifically by solver/scrambler even if isAnimating
+             // if (isAnimating && duration > 10) return; // Block manual rotation if already animating slowly
+             // Simplified: Let TWEEN handle overlapping animations if needed? Or rely on external flags.
+             // Use isAnimating flag set externally before calling.
+
+            isAnimating = true; // Ensure flag is set when rotation starts
+            controls.enabled = false; // Disable camera during rotation
+
+            const targetCoord = layerIndex;
+            const layerCubies = cubies.filter(cubie => {
+                let coord;
+                if (axis === 'x') coord = cubie.userData.logicalX;
+                else if (axis === 'y') coord = cubie.userData.logicalY;
+                else coord = cubie.userData.logicalZ;
+                return Math.abs(coord - targetCoord) < 0.1;
+            });
+
+            if (layerCubies.length === 0) {
+                 console.warn(`No cubies found for axis ${axis}, layerIndex ${layerIndex}`);
+                 isAnimating = false; // Reset flag if rotation fails
+                 resetDragState(); // Also reset drag state
+                 updateStatus("旋转错误", 2000);
+                 return;
+            }
+
+            rotationPivot.rotation.set(0, 0, 0);
+            rotationPivot.updateMatrixWorld(true); // Force update
+
+             layerCubies.forEach(cubie => rotationPivot.attach(cubie));
+
+            const angle = (Math.PI / 2) * direction;
+            const targetRotation = new THREE.Euler();
+            if (axis === 'x') targetRotation.x = angle;
+            else if (axis === 'y') targetRotation.y = angle;
+            else targetRotation.z = angle;
+
+             // Use a unique tween object for each rotation
+             const tween = new TWEEN.Tween(rotationPivot.rotation)
+                .to({ x: targetRotation.x, y: targetRotation.y, z: targetRotation.z }, duration)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .onComplete(() => {
+                    rotationPivot.updateMatrixWorld(true); // Ensure final state is updated
+
+                    layerCubies.forEach(cubie => {
+                        cubie.updateMatrixWorld();
+                        scene.attach(cubie);
+                        updateLogicalState(cubie, axis, direction);
+                         // Round transforms to prevent drift
+                         roundTransforms(cubie);
+                    });
+
+                    // Check if this was the *last* animation step
+                     // Need a more robust way if multiple tweens run concurrently (e.g., counter)
+                     // For now, assume simple cases: manual, scramble step, solve step
+                     if (!isSolving && !isScrambling) { // Manual rotation finished
+                         isAnimating = false;
+                         resetDragState(); // Resets drag state and enables controls if needed
+                         if (order === 3 && isSolved()) {
+                             updateStatus("魔方已还原！", 3000);
+                         } else {
+                             updateStatus("操作完成", 1500);
+                         }
+                     } else {
+                         // If solving or scrambling, the controlling function will reset isAnimating
+                         // Do nothing here, let the interval/timeout proceed.
+                     }
+                     // Ensure controls are enabled *if* drag is also finished
+                     if (!isDragging) {
+                         controls.enabled = true;
+                     }
+
+                })
+                .start();
+        }
+
+        function roundTransforms(obj) {
+            obj.position.x = Math.round(obj.position.x * 1000) / 1000;
+            obj.position.y = Math.round(obj.position.y * 1000) / 1000;
+            obj.position.z = Math.round(obj.position.z * 1000) / 1000;
+            obj.quaternion.x = Math.round(obj.quaternion.x * 1000) / 1000;
+            obj.quaternion.y = Math.round(obj.quaternion.y * 1000) / 1000;
+            obj.quaternion.z = Math.round(obj.quaternion.z * 1000) / 1000;
+            obj.quaternion.w = Math.round(obj.quaternion.w * 1000) / 1000;
+            obj.quaternion.normalize();
+            obj.updateMatrixWorld(); // Update matrix after rounding
+        }
+
+        function updateLogicalState(cubie, axis, direction) {
+            const { logicalX, logicalY, logicalZ } = cubie.userData;
+            const coords = new THREE.Vector3(logicalX, logicalY, logicalZ);
+            const angle = (Math.PI / 2) * direction;
+            const matrix = new THREE.Matrix4();
+
+            if (axis === 'x') matrix.makeRotationX(angle);
+            else if (axis === 'y') matrix.makeRotationY(angle);
+            else matrix.makeRotationZ(angle);
+
+            coords.applyMatrix4(matrix);
+            cubie.userData.logicalX = Math.round(coords.x);
+            cubie.userData.logicalY = Math.round(coords.y);
+            cubie.userData.logicalZ = Math.round(coords.z);
+        }
+
+        // --- UI and Control Functions ---
+        function setupUI() {
+            document.getElementById('generateBtn').addEventListener('click', () => {
+                const selectedOrder = parseInt(document.getElementById('orderSelect').value);
+                 resetSolverState(); // Stop any animation
+                 createCube(selectedOrder);
+            });
+
+            document.getElementById('scrambleBtn').addEventListener('click', scrambleCube);
+            document.getElementById('solveBtn').addEventListener('click', startSolveCube);
+            document.getElementById('orderSelect').addEventListener('change', (e) => {
+                 const selectedOrder = parseInt(e.target.value);
+                 // Enable/disable buttons based on order immediately
+                 resetSolverState(); // Also resets button states based on order
+                 // Optionally regenerate cube on order change? Current behaviour requires hitting Generate button.
+            });
+
+
+            const speedSlider = document.getElementById('solveSpeed');
+            const speedValueSpan = speedSlider.nextElementSibling;
+            speedSlider.addEventListener('input', (e) => {
+                solveSpeed = parseInt(e.target.value);
+                 speedValueSpan.textContent = `${solveSpeed}ms`;
+            });
+             speedValueSpan.textContent = `${solveSpeed}ms`;
+
+             // Control Panel Toggle
+            toggleControlsBtn.addEventListener('click', () => toggleControls());
+
+             document.getElementById('manualInputBtn').addEventListener('click', showManualInputPanel);
+             document.getElementById('cancelManualInputBtn').addEventListener('click', hideManualInputPanel);
+             document.getElementById('closeManualInputBtn').addEventListener('click', hideManualInputPanel);
+             document.getElementById('applyManualInputBtn').addEventListener('click', applyManualInput);
+
+             document.querySelectorAll('.color-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                     // Remove selected class from all, then add to clicked one
+                     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('selected'));
+                     e.target.classList.add('selected');
+
+                    currentManualColor = e.target.dataset.color;
+                    const currentColorSpan = document.getElementById('currentColor');
+                    currentColorSpan.style.backgroundColor = currentManualColor;
+                    currentColorSpan.textContent = e.target.textContent;
+                     currentColorSpan.style.color = (['yellow', 'white', 'orange'].includes(currentManualColor)) ? 'black' : 'white';
+                });
+             });
+             // Set initial color picker state
+             document.querySelector('.color-btn[data-color="white"]').click();
+        }
+
+        function toggleControls(forceCollapse = null) {
+            const shouldCollapse = forceCollapse !== null ? forceCollapse : !controlsElement.classList.contains('collapsed');
+            if (shouldCollapse) {
+                controlsElement.classList.add('collapsed');
+                toggleControlsBtn.textContent = "展开控制";
+            } else {
+                controlsElement.classList.remove('collapsed');
+                toggleControlsBtn.textContent = "收起";
+            }
+        }
+
+        function updateStatus(message, duration = 0) {
+            // Clear previous timeout if any
+            if (statusTimeout) clearTimeout(statusTimeout);
+
+            statusElement.textContent = message;
+            statusElement.classList.remove('hide');
+            statusElement.classList.add('show'); // Make visible
+
+            // If duration is provided, hide after timeout
+            if (duration > 0) {
+                statusTimeout = setTimeout(() => {
+                    statusElement.classList.remove('show');
+                    statusElement.classList.add('hide');
+                }, duration);
+            }
+        }
+
+         function disableButtons() {
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('scrambleBtn').disabled = true;
+            document.getElementById('solveBtn').disabled = true;
+            document.getElementById('manualInputBtn').disabled = true;
+            document.getElementById('orderSelect').disabled = true;
+         }
+
+         function enableButtons() {
+             // Re-enable based on current state (e.g., order)
+             const currentOrder = parseInt(document.getElementById('orderSelect').value);
+             document.getElementById('generateBtn').disabled = false;
+             document.getElementById('scrambleBtn').disabled = false;
+             document.getElementById('solveBtn').disabled = (currentOrder !== 3 || typeof solveCube !== 'function'); // Disable if not 3x3 or solver failed load
+             document.getElementById('manualInputBtn').disabled = (currentOrder !== 3);
+             document.getElementById('orderSelect').disabled = false;
+         }
+
+        function scrambleCube() {
+            if (isAnimating) return; // Don't scramble if already animating
+
+            resetSolverState(); // Stop any ongoing solve/animation first
+            isAnimating = true;
+            isScrambling = true; // Set scramble flag
+            disableInteraction(); // Disable controls/interaction
+            disableButtons();
+            controls.enabled = false; // Explicitly disable OrbitControls
+
+            const scrambleMoves = order * order + Math.floor(Math.random() * order); // More moves for higher orders
+            const axes = ['x', 'y', 'z'];
+            const directions = [1, -1];
+            const halfOrder = (order - 1) / 2;
+            let movesApplied = 0;
+
+            updateStatus(`正在打乱 (${scrambleMoves} 步)...`, 0);
+
+            function applyMove() {
+                if (movesApplied >= scrambleMoves) {
+                    // Scramble finished
+                    isAnimating = false;
+                    isScrambling = false;
+                    enableInteraction(); // Re-enable interaction
+                    enableButtons(); // Re-enable buttons
+                    controls.enabled = true; // Re-enable OrbitControls
+                    updateStatus("打乱完成", 2000);
+                    return;
+                }
+
+                const axis = axes[Math.floor(Math.random() * axes.length)];
+                const layerIndex = Math.floor(Math.random() * order) - halfOrder;
+                const direction = directions[Math.floor(Math.random() * directions.length)];
+
+                // Apply instantly (Duration 0)
+                // Directly update logical state and transforms, bypass animation for speed?
+                // Or use rotateLayer with 0 duration. Let's try rotateLayer first.
+
+                // We need to update logical state immediately for the *next* move selection potentially
+                // rotateLayer with duration 0 *should* call onComplete synchronously if TWEEN handles it well.
+                // Let's assume TWEEN with duration 0 calls onComplete immediately.
+
+                 // Find cubies for immediate state update
+                 const targetCoord = layerIndex;
+                 const layerCubies = cubies.filter(cubie => {
+                     let coord;
+                     if (axis === 'x') coord = cubie.userData.logicalX;
+                     else if (axis === 'y') coord = cubie.userData.logicalY;
+                     else coord = cubie.userData.logicalZ;
+                     return Math.abs(coord - targetCoord) < 0.1;
+                 });
+
+                // Apply visual rotation instantly (using TWEEN 0 duration)
+                 rotateLayer(axis, layerIndex, direction, 0); // Duration 0
+
+                // Apply logical state update immediately (redundant if rotateLayer(0) works perfectly)
+                 layerCubies.forEach(cubie => {
+                    updateLogicalState(cubie, axis, direction);
+                     // Manually apply transform instantly without TWEEN for scrambling
+                     const angle = Math.PI / 2 * direction;
+                     const rotMatrix = new THREE.Matrix4();
+                     if (axis === 'x') rotMatrix.makeRotationX(angle);
+                     else if (axis === 'y') rotMatrix.makeRotationY(angle);
+                     else rotMatrix.makeRotationZ(angle);
+
+                     cubie.applyMatrix4(rotMatrix); // Apply rotation
+                     roundTransforms(cubie); // Round and update matrix
+                 });
+
+
+                movesApplied++;
+                // Use setTimeout for recursion to prevent stack overflow and allow UI to breathe
+                setTimeout(applyMove, 5); // Very short delay
+            }
+
+             // Start the scramble
+             applyMove();
+        }
+
+        // --- Solving Logic (3x3 Only) ---
+        function resetSolverState() {
+             if (solverInterval) {
+                clearInterval(solverInterval);
+                solverInterval = null;
+             }
+             isAnimating = false; // Ensure animation flag is reset
+             isSolving = false;
+             isScrambling = false;
+             document.getElementById('solveBtn').textContent = "自动还原 (仅3阶)";
+             enableButtons(); // Re-enables based on current order
+             if (!isDragging) {
+                controls.enabled = true; // Re-enable controls if not dragging
+                enableInteraction();
+             }
+        }
+
+        function startSolveCube() {
+             if (order !== 3) {
+                 updateStatus("自动还原仅支持三阶魔方！", 3000);
+                 return;
+             }
+              if (typeof solveCube !== 'function') {
+                 updateStatus("错误：求解器库未加载！", 3000);
+                 return;
+             }
+             if (isAnimating && isSolving) { // If currently solving, stop it
+                 resetSolverState();
+                 updateStatus("还原已停止", 2000);
+                 return;
+             }
+             if (isAnimating) { // Don't start if another animation (like scramble) is running
+                 updateStatus("请等待当前操作完成", 2000);
+                 return;
+             }
+
+             updateStatus("检查当前状态...", 0);
+             const stateString = getCubeStateString();
+             if (!stateString) {
+                 updateStatus("无法获取魔方状态，请检查", 3000);
+                 resetSolverState();
+                 return;
+             }
+
+             if (isSolved(stateString)) {
+                 updateStatus("魔方已经是还原状态！", 3000);
+                 resetSolverState();
+                 return;
+             }
+
+             updateStatus("计算解决方案...", 0);
+             disableButtons(); // Disable all buttons during solve attempt
+             document.getElementById('solveBtn').disabled = false; // Keep stop button enabled
+             document.getElementById('solveBtn').textContent = "停止还原";
+             disableInteraction(); // Disable manual interaction
+             controls.enabled = false;
+             isAnimating = true;
+             isSolving = true;
+
+             try {
+                // Use setTimeout to allow UI update before potentially blocking call
+                setTimeout(() => {
+                     // console.log("Calling solver with state:", stateString);
+                     // console.log("solveCube function:", solveCube); // Double check before calling
+                     const solution = solveCube(stateString);
+                    // console.log("Solver returned:", solution);
+
+                    if (!solution || typeof solution !== 'string' || solution.trim() === "" || solution.toLowerCase().includes('error')) {
+                         throw new Error(solution || "求解器未能返回有效方案");
+                    }
+
+                    const moves = solution.trim().split(/\s+/); // Split by whitespace
+                    animateSolution(moves);
+                }, 50);
+
+             } catch (error) {
+                 console.error("Solver error:", error);
+                 updateStatus(`求解出错: ${error.message}`, 5000);
+                 resetSolverState(); // Reset state on error
+             }
+        }
+
+        function animateSolution(moves) {
+            let moveIndex = 0;
+
+            function nextMove() {
+                // Check if solving was stopped externally
+                if (!isSolving || !isAnimating) {
+                    if (solverInterval) clearInterval(solverInterval);
+                    solverInterval = null;
+                    // Don't reset state here, let the stop button handler do it
+                    return;
+                }
+
+                if (moveIndex >= moves.length) {
+                    clearInterval(solverInterval);
+                    solverInterval = null;
+                    isAnimating = false; // Animation sequence finished
+                    isSolving = false;
+                    updateStatus("魔方已还原！", 3000);
+                    resetSolverState(); // Reset flags and buttons
+                     // Final verification
+                    if (!isSolved()) {
+                         console.warn("Solver finished, but cube is not in solved state according to isSolved().");
+                         updateStatus("还原完成（可能存在小误差）", 4000);
+                    }
+                    return;
+                }
+
+                const move = moves[moveIndex];
+                if (!move) {
+                    moveIndex++;
+                    nextMove(); // Skip empty moves
+                    return;
+                }
+
+                const parsed = parseMove(move);
+
+                if (parsed && parsed.axis) {
+                     updateStatus(`还原中: ${move} (${moveIndex + 1}/${moves.length})`, 0);
+                     // Apply the rotation
+                     rotateLayer(parsed.axis, parsed.layerIndex, parsed.direction, solveSpeed * 0.8); // Animate slightly faster than interval
+                     // Handle double moves (like F2) - execute twice
+                     if (parsed.turns === 2) {
+                         // Schedule the second turn slightly after the first animation *should* finish
+                         // This relies on the timing being consistent.
+                         // A more robust way might involve chaining tweens or using promises.
+                          setTimeout(() => {
+                              if (isSolving && isAnimating) { // Check if still solving
+                                 rotateLayer(parsed.axis, parsed.layerIndex, parsed.direction, solveSpeed * 0.8);
+                              }
+                          }, solveSpeed); // Schedule after the first move interval
+                     }
+                } else {
+                    console.warn("Skipping unrecognized move:", move);
+                }
+
+                moveIndex++;
+            }
+
+            // Clear any existing interval
+            if (solverInterval) clearInterval(solverInterval);
+
+            // Start the interval timer
+            // Note: The actual animation is triggered by rotateLayer. The interval just sequences the calls.
+             const intervalTime = solveSpeed; // Base interval matches slider
+             solverInterval = setInterval(nextMove, intervalTime);
+             // Execute the first move immediately without waiting for the first interval
+             nextMove();
+        }
+
+        function parseMove(move) {
+            if (!move || move.length === 0) return null;
+            const face = move.charAt(0).toUpperCase(); // Use uppercase for consistency
+            const modifier = move.length > 1 ? move.charAt(1) : '';
+
+            let direction = 1;
+            let turns = 1;
+
+            if (modifier === "'") {
+                direction = -1;
+            } else if (modifier === '2') {
+                turns = 2;
+            }
+
+            let axis = null;
+            let layerIndex = null;
+            const halfOrder = (order - 1) / 2; // Should be 1 for 3x3
+
+            // Basic 3x3 Face Moves
+            switch (face) {
+                case 'R': axis = 'x'; layerIndex = halfOrder; break;
+                case 'L': axis = 'x'; layerIndex = -halfOrder; break;
+                case 'U': axis = 'y'; layerIndex = halfOrder; break;
+                case 'D': axis = 'y'; layerIndex = -halfOrder; break;
+                case 'F': axis = 'z'; layerIndex = halfOrder; break;
+                case 'B': axis = 'z'; layerIndex = -halfOrder; break;
+                // Add Middle Slice Moves (M, E, S for 3x3) if solver uses them
+                 case 'M': axis = 'x'; layerIndex = 0; direction *= -1; break; // M opposite to L/R convention? Check solver doc. Assume opposite L.
+                 case 'E': axis = 'y'; layerIndex = 0; direction *= -1; break; // E opposite to D/U convention? Assume opposite D.
+                 case 'S': axis = 'z'; layerIndex = 0; break; // S aligned with F convention? Assume aligned.
+                 // Add Wide Moves (r, l, u, d, f, b) if needed - require parsing axis and multiple layers
+                default:
+                    console.warn("Unknown move face:", face);
+                    return null;
+            }
+
+             // The solver library should handle 'F2' internally, we just need to parse it
+             // Our rotateLayer currently only does 90 degrees.
+             // So, if turns=2, the caller (animateSolution) needs to handle calling it twice.
+             // Modify return value to include turns.
+            return { axis, layerIndex, direction, turns };
+        }
+
+
+        // --- State Checking and Conversion (3x3 Specific for Solver) ---
+        function getCubeStateString() {
+            if (order !== 3) return null;
+            // If cubies array is empty (e.g., during initial load)
+            if (!cubies || cubies.length === 0) {
+                console.warn("getCubeStateString called before cubies are initialized.");
+                return null;
+            }
+
+            const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
+            let state = '';
+            const faceMapping = { /* ... same mapping as before ... */
+                 U: { normal: new THREE.Vector3(0, 1, 0), indices: [ [-1,1,-1], [0,1,-1], [1,1,-1], [-1,1,0], [0,1,0], [1,1,0], [-1,1,1], [0,1,1], [1,1,1] ] },
+                 R: { normal: new THREE.Vector3(1, 0, 0), indices: [ [1,1,-1], [1,1,0], [1,1,1], [1,0,-1], [1,0,0], [1,0,1], [1,-1,-1], [1,-1,0], [1,-1,1] ] },
+                 F: { normal: new THREE.Vector3(0, 0, 1), indices: [ [-1,1,1], [0,1,1], [1,1,1], [-1,0,1], [0,0,1], [1,0,1], [-1,-1,1], [0,-1,1], [1,-1,1] ] },
+                 D: { normal: new THREE.Vector3(0,-1, 0), indices: [ [-1,-1,1], [0,-1,1], [1,-1,1], [-1,-1,0], [0,-1,0], [1,-1,0], [-1,-1,-1], [0,-1,-1], [1,-1,-1] ] },
+                 L: { normal: new THREE.Vector3(-1, 0, 0), indices: [ [-1,1,1], [-1,1,0], [-1,1,-1], [-1,0,1], [-1,0,0], [-1,0,-1], [-1,-1,1], [-1,-1,0], [-1,-1,-1] ] },
+                 B: { normal: new THREE.Vector3(0, 0,-1), indices: [ [1,1,-1], [0,1,-1], [-1,1,-1], [1,0,-1], [0,0,-1], [-1,0,-1], [1,-1,-1], [0,-1,-1], [-1,-1,-1] ] }
+            };
+
+             try { // Add try-catch around state generation
+                for (const face of faceOrder) {
+                    const map = faceMapping[face];
+                    const faceNormalWorld = map.normal;
+
+                    for (const logicalCoords of map.indices) {
+                        const [lx, ly, lz] = logicalCoords;
+                        // Find cubie currently at this logical position
+                        const cubie = cubies.find(c =>
+                            Math.abs(c.userData.logicalX - lx) < 0.1 &&
+                            Math.abs(c.userData.logicalY - ly) < 0.1 &&
+                            Math.abs(c.userData.logicalZ - lz) < 0.1
+                        );
+
+                        if (!cubie) {
+                             throw new Error(`Cubie not found at logical position ${lx}, ${ly}, ${lz} for face ${face}`);
+                        }
+
+                        const color = getCubieFaceColor(cubie, faceNormalWorld);
+                        if (color === null) { // Allow inner color check here if needed, but shouldn't happen for outer faces
+                             throw new Error(`Could not determine color for cubie at ${lx},${ly},${lz} on face ${face}`);
+                        }
+
+                        const colorChar = faceChars[color];
+                        if (!colorChar) {
+                            throw new Error(`Unknown color hex ${color.toString(16)} found on cubie`);
+                        }
+                        state += colorChar;
+                    }
+                }
+                return state;
+             } catch (error) {
+                 console.error("Error generating cube state string:", error);
+                 updateStatus("错误：无法读取魔方状态", 4000);
+                 return null;
+             }
+        }
+
+        function getCubieFaceColor(cubie, faceNormalWorld) {
+             try {
+                const invWorldMatrix = cubie.matrixWorld.clone().invert();
+                const localNormal = faceNormalWorld.clone().transformDirection(invWorldMatrix).round();
+
+                let materialIndex = -1;
+                if (localNormal.x > 0.9) materialIndex = 0;      // R
+                else if (localNormal.x < -0.9) materialIndex = 1; // L
+                else if (localNormal.y > 0.9) materialIndex = 2;  // U
+                else if (localNormal.y < -0.9) materialIndex = 3; // D
+                else if (localNormal.z > 0.9) materialIndex = 4;  // F
+                else if (localNormal.z < -0.9) materialIndex = 5; // B
+
+                if (materialIndex !== -1 && Array.isArray(cubie.material)) {
+                    const material = cubie.material[materialIndex];
+                     // Check if the material's color is the inner color
+                     if (material && material.color.getHex() !== faceColors.inner) {
+                         return material.color.getHex();
+                     }
+                }
+             } catch (e) {
+                 console.error("Error in getCubieFaceColor:", e, "Cubie:", cubie, "Normal:", faceNormalWorld);
+             }
+            return null; // Return null if it's an inner face or error occurred
+        }
+
+        // Checks if solved (geometric check works for N-order)
+        function isSolved(stateString = null) {
+            if (order === 3 && stateString) {
+                const solvedState = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBB";
+                if (stateString === solvedState) return true;
+                 // Optional: Detailed check if needed, but direct string comparison is faster
+            }
+            if (!cubies || cubies.length === 0) return false; // Not solved if no cubies
+
+            const halfOrder = (order - 1) / 2;
+            const facesToCheck = [
+                 { normal: new THREE.Vector3(1, 0, 0), coord: 'x', value: halfOrder, expectedColor: faceColors.R },
+                 { normal: new THREE.Vector3(-1, 0, 0), coord: 'x', value: -halfOrder, expectedColor: faceColors.L },
+                 { normal: new THREE.Vector3(0, 1, 0), coord: 'y', value: halfOrder, expectedColor: faceColors.U },
+                 { normal: new THREE.Vector3(0,-1, 0), coord: 'y', value: -halfOrder, expectedColor: faceColors.D },
+                 { normal: new THREE.Vector3(0, 0, 1), coord: 'z', value: halfOrder, expectedColor: faceColors.F },
+                 { normal: new THREE.Vector3(0, 0,-1), coord: 'z', value: -halfOrder, expectedColor: faceColors.B }
+            ];
+
+            for (const faceInfo of facesToCheck) {
+                const { normal, coord, value, expectedColor } = faceInfo;
+                // Find cubies physically located on this face layer
+                 const faceCubies = cubies.filter(c => Math.abs(c.userData[`logical${coord.toUpperCase()}`] - value) < 0.1);
+
+                for (const cubie of faceCubies) {
+                    const color = getCubieFaceColor(cubie, normal);
+                     // If getCubieFaceColor returns null, it's an inner facelet (or error), skip check for this facelet
+                     if (color === null) continue;
+
+                     if (color !== expectedColor) {
+                         // console.log(`Not solved: Face ${coord}=${value}, Cubie Log(${cubie.userData.logicalX},${cubie.userData.logicalY},${cubie.userData.logicalZ}), Expected ${expectedColor.toString(16)}, Got ${color.toString(16)}`);
+                         return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+         // --- Manual Input (3x3 Only) ---
+        function showManualInputPanel() {
+             if (order !== 3) {
+                 updateStatus("手动录入仅支持三阶魔方", 3000);
+                 return;
+             }
+             if (isAnimating) {
+                 updateStatus("请等待当前操作完成", 2000);
+                 return;
+             }
+             manualInputMode = true;
+             generateManualInputGrids(); // Regenerate each time to reset state
+             document.getElementById('manualInputPanel').style.display = 'block';
+             document.getElementById('manualInputBtn').style.display = 'none';
+             document.getElementById('cancelManualInputBtn').style.display = 'inline-block';
+             disableInteraction(); // Disable 3D interaction
+             controls.enabled = false; // Disable camera controls
+              updateStatus("手动录入模式...", 0);
+        }
+
+        function hideManualInputPanel() {
+             manualInputMode = false;
+             document.getElementById('manualInputPanel').style.display = 'none';
+             document.getElementById('manualInputBtn').style.display = 'inline-block'; // Might be disabled based on order
+             document.getElementById('cancelManualInputBtn').style.display = 'none';
+             enableInteraction(); // Re-enable 3D interaction
+             controls.enabled = true;
+             updateStatus("已退出手动录入", 2000);
+             enableButtons(); // Ensure buttons are correct state
+        }
+
+        function generateManualInputGrids() {
+            const gridsContainer = document.getElementById('manualInputGrids');
+            gridsContainer.innerHTML = '';
+            manualInputState = {};
+
+            const faces = ['U', 'R', 'F', 'D', 'L', 'B'];
+            const layout = [
+                 { face: 'U', row: 0, col: 1, color: 'white' },
+                 { face: 'L', row: 1, col: 0, color: 'orange' },
+                 { face: 'F', row: 1, col: 1, color: 'blue' },
+                 { face: 'R', row: 1, col: 2, color: 'red' },
+                 { face: 'B', row: 1, col: 3, color: 'green' }, // Show B next to R
+                 { face: 'D', row: 2, col: 1, color: 'yellow' }
+            ];
+            const layoutGrid = document.createElement('div');
+            layoutGrid.style.cssText = `display: grid; grid-template-columns: repeat(4, auto); grid-template-rows: repeat(3, auto); gap: 15px; justify-content: center; align-items: center;`;
+
+             faces.forEach(face => {
+                manualInputState[face] = Array(9).fill(null);
+                const faceContainer = document.createElement('div');
+                const layoutInfo = layout.find(l => l.face === face);
+                if (layoutInfo) {
+                    faceContainer.style.gridRow = layoutInfo.row + 1;
+                    faceContainer.style.gridColumn = layoutInfo.col + 1;
+                }
+                faceContainer.innerHTML = `<div style="font-weight: bold; text-align: center; margin-bottom: 5px;">${face}</div>`;
+                const grid = document.createElement('div');
+                grid.className = 'face-grid';
+                grid.style.gridTemplateColumns = 'repeat(3, auto)';
+
+                for (let i = 0; i < 9; i++) {
+                    const facelet = document.createElement('div');
+                    facelet.className = 'facelet';
+                    facelet.dataset.face = face;
+                    facelet.dataset.index = i;
+                    if (i === 4 && layoutInfo) { // Center facelet
+                        updateManualFacelet(face, i, layoutInfo.color, grid); // Use helper, pass grid
+                    } else {
+                        facelet.style.backgroundColor = '#555';
+                        facelet.textContent = '?';
+                        facelet.addEventListener('click', onFaceletClick);
+                    }
+                    grid.appendChild(facelet);
+                }
+                faceContainer.appendChild(grid);
+                layoutGrid.appendChild(faceContainer);
+            });
+            gridsContainer.appendChild(layoutGrid);
+        }
+
+        function onFaceletClick(event) {
+            const facelet = event.target;
+            const face = facelet.dataset.face;
+            const index = parseInt(facelet.dataset.index);
+            updateManualFacelet(face, index, currentManualColor, facelet.parentElement); // Pass grid
+        }
+
+         function updateManualFacelet(face, index, colorName, gridElement) {
+             manualInputState[face][index] = colorName;
+             const faceletElement = gridElement // Search within the specific grid
+                 ? gridElement.querySelector(`.facelet[data-face="${face}"][data-index="${index}"]`)
+                 : document.querySelector(`#manualInputGrids .facelet[data-face="${face}"][data-index="${index}"]`); // Fallback search
+
+             if (faceletElement) {
+                 faceletElement.style.backgroundColor = colorName;
+                 const shortName = colorName.charAt(0).toUpperCase();
+                 faceletElement.textContent = shortName;
+                 faceletElement.style.color = (['yellow', 'white', 'orange'].includes(colorName)) ? 'black' : 'white';
+                 // Make center piece non-clickable visually and functionally
+                 if (index === 4) {
+                     faceletElement.style.cursor = 'default';
+                     faceletElement.replaceWith(faceletElement.cloneNode(true)); // Remove listeners by cloning
+                 }
+             } else {
+                 console.warn(`Facelet element not found for ${face}[${index}]`);
+             }
+         }
+
+         function applyManualInput() {
+             let stateString = "";
+             const colorCounts = {};
+             const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
+
+             try {
+                 for (const face of faceOrder) {
+                     if (!manualInputState[face] || manualInputState[face].length !== 9) throw new Error(`面 ${face} 数据不完整`);
+                     for (const colorName of manualInputState[face]) {
+                         if (!colorName) throw new Error(`面 ${face} 有未设置的块`);
+                         const colorChar = colorName.charAt(0).toUpperCase();
+                         stateString += colorChar;
+                         colorCounts[colorChar] = (colorCounts[colorChar] || 0) + 1;
+                     }
+                 }
+                 for (const char of ['U', 'R', 'F', 'D', 'L', 'B']) {
+                     if (colorCounts[char] !== 9) throw new Error(`颜色 ${char} 的数量 (${colorCounts[char]}) 不正确，应为9`);
+                 }
+             } catch (error) {
+                 updateStatus(`输入错误: ${error.message}`, 4000);
+                 return;
+             }
+
+             // Optional: Add advanced solvability check here (parity etc.)
+
+             updateStatus("应用状态...", 1000);
+             updateCubeVisualsFromStateString(stateString);
+             hideManualInputPanel();
+              // Verify if solved immediately after applying
+              if (isSolved(stateString)) {
+                  updateStatus("手动状态已应用 (已还原)", 3000);
+              } else {
+                   updateStatus("手动状态已应用", 3000);
+              }
+         }
+
+         function updateCubeVisualsFromStateString(stateString) {
+             if (order !== 3 || stateString.length !== 54 || !cubies || cubies.length === 0) return;
+
+             // Reset cube to solved state logically and visually first
+             // This ensures correct mapping when applying colors
+             resetCubeToSolvedState(); // Implement this helper
+
+             const faceOrder = ['U', 'R', 'F', 'D', 'L', 'B'];
+             const faceMapping = { /* ... copy faceMapping again ... */
+                 U: { normal: new THREE.Vector3(0, 1, 0), indices: [ [-1,1,-1], [0,1,-1], [1,1,-1], [-1,1,0], [0,1,0], [1,1,0], [-1,1,1], [0,1,1], [1,1,1] ] },
+                 R: { normal: new THREE.Vector3(1, 0, 0), indices: [ [1,1,-1], [1,1,0], [1,1,1], [1,0,-1], [1,0,0], [1,0,1], [1,-1,-1], [1,-1,0], [1,-1,1] ] },
+                 F: { normal: new THREE.Vector3(0, 0, 1), indices: [ [-1,1,1], [0,1,1], [1,1,1], [-1,0,1], [0,0,1], [1,0,1], [-1,-1,1], [0,-1,1], [1,-1,1] ] },
+                 D: { normal: new THREE.Vector3(0,-1, 0), indices: [ [-1,-1,1], [0,-1,1], [1,-1,1], [-1,-1,0], [0,-1,0], [1,-1,0], [-1,-1,-1], [0,-1,-1], [1,-1,-1] ] },
+                 L: { normal: new THREE.Vector3(-1, 0, 0), indices: [ [-1,1,1], [-1,1,0], [-1,1,-1], [-1,0,1], [-1,0,0], [-1,0,-1], [-1,-1,1], [-1,-1,0], [-1,-1,-1] ] },
+                 B: { normal: new THREE.Vector3(0, 0,-1), indices: [ [1,1,-1], [0,1,-1], [-1,1,-1], [1,0,-1], [0,0,-1], [-1,0,-1], [1,-1,-1], [0,-1,-1], [-1,-1,-1] ] }
+             };
+             const colorCharMap = { 'U': faceColors.U, 'R': faceColors.R, 'F': faceColors.F, 'D': faceColors.D, 'L': faceColors.L, 'B': faceColors.B };
+
+             let stringIndex = 0;
+             for (const face of faceOrder) {
+                 const map = faceMapping[face];
+                 const faceNormalWorld = map.normal; // Normal of the *solved* face
+
+                 for (const logicalCoords of map.indices) {
+                     const [lx, ly, lz] = logicalCoords;
+                     // Find the cubie that *belongs* at this logical position when solved
+                     const cubie = cubies.find(c =>
+                         c.userData.initialX === lx && c.userData.initialY === ly && c.userData.initialZ === lz
+                     );
+
+                     if (!cubie) {
+                         console.error(`Apply Visual Error: Cubie with initial pos ${lx},${ly},${lz} not found`);
+                         continue;
+                     }
+
+                     // Determine which material index corresponds to the faceNormalWorld direction
+                     // in the cubie's *initial* (unrotated) state.
+                      let materialIndex = -1;
+                      // Match normal to initial geometry axes
+                      if (Math.abs(faceNormalWorld.x - 1) < 0.1) materialIndex = 0; // R (+X)
+                      else if (Math.abs(faceNormalWorld.x + 1) < 0.1) materialIndex = 1; // L (-X)
+                      else if (Math.abs(faceNormalWorld.y - 1) < 0.1) materialIndex = 2; // U (+Y)
+                      else if (Math.abs(faceNormalWorld.y + 1) < 0.1) materialIndex = 3; // D (-Y)
+                      else if (Math.abs(faceNormalWorld.z - 1) < 0.1) materialIndex = 4; // F (+Z)
+                      else if (Math.abs(faceNormalWorld.z + 1) < 0.1) materialIndex = 5; // B (-Z)
+
+
+                     if (materialIndex !== -1 && Array.isArray(cubie.material)) {
+                         const colorChar = stateString[stringIndex];
+                         const colorHex = colorCharMap[colorChar];
+                         if (colorHex !== undefined && cubie.material[materialIndex].color.getHex() !== faceColors.inner) {
+                             cubie.material[materialIndex].color.setHex(colorHex);
+                         } else if (colorHex === undefined) {
+                             console.warn(`Invalid color character '${colorChar}' in state string`);
+                         }
+                     } else {
+                          console.warn(`Apply Visual Error: Could not find material index for normal ${faceNormalWorld.toArray()} on cubie initial ${lx},${ly},${lz}`);
+                     }
+                     stringIndex++;
+                 }
+             }
+             // Important: After setting colors based on initial state, we must assume
+             // the provided stateString represents the *current* logical state.
+             // We need to update the logicalX/Y/Z and transforms to match.
+             // This is complex. A simpler approach for manual input might be:
+             // 1. Generate the state string from the *current* 3D cube.
+             // 2. Let the user edit this state string (or the 2D representation).
+             // 3. Apply the *edited* state string visually (as done above).
+             // 4. **Crucially, derive the sequence of moves needed to get from the *solved* state to the *input* state and apply those moves logically/visually.** This is essentially solving the inverse problem and is hard.
+
+             // **Simplified Approach for Manual Input Apply:**
+             // Assume the user input IS the current state. We've updated the visuals.
+             // NOW, we need to figure out the logicalX/Y/Z for each cubie based on the applied colors.
+             // This is effectively running the core logic of `getCubeStateString` in reverse on itself.
+             // This seems overly complex and prone to errors.
+
+             // **Alternative (Recommended) Manual Apply:**
+             // 1. Get the input `stateString`.
+             // 2. Reset the 3D cube to the visually solved state (`resetCubeToSolvedState`).
+             // 3. *Solve* the input `stateString` to get moves from input -> solved (`solution = solve(stateString)`).
+             // 4. *Invert* the solution sequence (e.g., R becomes R', U' becomes U, order reverses).
+             // 5. Apply the *inverted* sequence instantly (duration 0) to the solved cube. This brings the 3D cube to the manually input state.
+
+             // Let's implement the alternative approach.
+             applyStateBySolvingInverse(stateString);
+         }
+
+         function resetCubeToSolvedState() {
+             if (!cubies) return;
+             const halfOrder = (order - 1) / 2;
+             cubies.forEach(cubie => {
+                 // Reset logical position
+                 cubie.userData.logicalX = cubie.userData.initialX;
+                 cubie.userData.logicalY = cubie.userData.initialY;
+                 cubie.userData.logicalZ = cubie.userData.initialZ;
+                 // Reset visual transform
+                 cubie.position.set(cubie.userData.initialX * cubieSize, cubie.userData.initialY * cubieSize, cubie.userData.initialZ * cubieSize);
+                 cubie.rotation.set(0, 0, 0);
+                 cubie.quaternion.set(0, 0, 0, 1);
+                 cubie.updateMatrixWorld(true);
+
+                 // Reset colors (can optimize by caching initial materials)
+                 if (Array.isArray(cubie.material)) {
+                    const x = cubie.userData.initialX;
+                    const y = cubie.userData.initialY;
+                    const z = cubie.userData.initialZ;
+                    cubie.material[0].color.setHex((x === halfOrder) ? faceColors.R : faceColors.inner);
+                    cubie.material[1].color.setHex((x === -halfOrder) ? faceColors.L : faceColors.inner);
+                    cubie.material[2].color.setHex((y === halfOrder) ? faceColors.U : faceColors.inner);
+                    cubie.material[3].color.setHex((y === -halfOrder) ? faceColors.D : faceColors.inner);
+                    cubie.material[4].color.setHex((z === halfOrder) ? faceColors.F : faceColors.inner);
+                    cubie.material[5].color.setHex((z === -halfOrder) ? faceColors.B : faceColors.inner);
+                 }
+             });
+             // console.log("Cube reset to solved state.");
+         }
+
+         function applyStateBySolvingInverse(stateString) {
+              if (order !== 3 || typeof solveCube !== 'function') return;
+              if (isSolved(stateString)) { // If input state is already solved, just reset visuals
+                  resetCubeToSolvedState();
+                  return;
+              }
+
+              updateStatus("应用状态 (计算中)...", 0);
+              try {
+                  const solutionToSolved = solveCube(stateString);
+                  if (!solutionToSolved || typeof solutionToSolved !== 'string' || solutionToSolved.toLowerCase().includes('error')) {
+                      throw new Error(solutionToSolved || "求解器未能返回有效方案");
+                  }
+
+                  const movesToSolved = solutionToSolved.trim().split(/\s+/);
+                  const invertedMoves = invertMoveSequence(movesToSolved);
+
+                  // Reset cube visuals/logic to solved first
+                  resetCubeToSolvedState();
+
+                  // Apply inverted moves instantly
+                  updateStatus("应用状态 (应用中)...", 0);
+                  invertedMoves.forEach(move => {
+                      const parsed = parseMove(move);
+                      if (parsed && parsed.axis) {
+                          // Apply logical state update instantly
+                          const layerCubies = cubies.filter(c => Math.abs(c.userData[`logical${parsed.axis.toUpperCase()}`] - parsed.layerIndex) < 0.1);
+                           layerCubies.forEach(cubie => {
+                              updateLogicalState(cubie, parsed.axis, parsed.direction);
+                               // Apply visual transform instantly
+                               const angle = Math.PI / 2 * parsed.direction;
+                               const rotMatrix = new THREE.Matrix4();
+                               if (parsed.axis === 'x') rotMatrix.makeRotationX(angle);
+                               else if (parsed.axis === 'y') rotMatrix.makeRotationY(angle);
+                               else rotMatrix.makeRotationZ(angle);
+                               cubie.applyMatrix4(rotMatrix);
+                               roundTransforms(cubie);
+                           });
+                          // Handle double moves (apply logic twice)
+                          if (parsed.turns === 2) {
+                               layerCubies.forEach(cubie => {
+                                  updateLogicalState(cubie, parsed.axis, parsed.direction);
+                                   const angle = Math.PI / 2 * parsed.direction;
+                                   const rotMatrix = new THREE.Matrix4();
+                                   if (parsed.axis === 'x') rotMatrix.makeRotationX(angle);
+                                   else if (parsed.axis === 'y') rotMatrix.makeRotationY(angle);
+                                   else rotMatrix.makeRotationZ(angle);
+                                   cubie.applyMatrix4(rotMatrix);
+                                   roundTransforms(cubie);
+                               });
+                          }
+                      }
+                  });
+                  updateStatus("手动状态已应用", 3000);
+
+              } catch(error) {
+                   console.error("Error applying state via inverse solve:", error);
+                   updateStatus(`应用状态出错: ${error.message}`, 5000);
+                   resetCubeToSolvedState(); // Reset to solved on error
+              }
+         }
+
+         function invertMoveSequence(moves) {
+             return moves.reverse().map(move => {
+                 if (!move || move.length === 0) return '';
+                 const face = move.charAt(0);
+                 const modifier = move.length > 1 ? move.charAt(1) : '';
+                 if (modifier === "'") return face; // R' becomes R
+                 if (modifier === '2') return move; // R2 stays R2
+                 return face + "'"; // R becomes R'
+             }).filter(move => move !== ''); // Filter out empty strings
+         }
+
+
+        // --- Start the application ---
+        init();
+
+    </script>
+</body>
+</html>

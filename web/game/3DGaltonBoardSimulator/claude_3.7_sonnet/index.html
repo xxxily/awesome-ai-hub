@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D高尔顿板模拟器</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e6e6e6;
+        }
+        #container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: #e6e6e6;
+            z-index: 100;
+            display: block;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        #info h1 {
+            font-size: 2.2em;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
+        }
+        #controls {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background: rgba(16, 18, 27, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            color: #e6e6e6;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 300px;
+        }
+        .slider-container {
+            margin: 15px 0;
+        }
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #00f2fe;
+            transform: scale(1.1);
+        }
+        button {
+            margin: 10px 5px;
+            padding: 10px 15px;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        #stats {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #distribution {
+            font-family: monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        .chart-container {
+            margin-top: 15px;
+            height: 150px;
+            position: relative;
+        }
+        #chart {
+            width: 100%;
+            height: 100%;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top-color: #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+    <div id="container"></div>
+    <div id="info">
+        <h1>3D高尔顿板模拟器</h1>
+        <p>一个直观展示概率、正态分布和大数法则的交互式模拟器</p>
+    </div>
+    <div id="controls">
+        <div class="slider-container">
+            <label for="rows">钉子行数: <span id="rowValue">10</span></label>
+            <input type="range" id="rows" min="5" max="20" value="10" step="1">
+        </div>
+        <div class="slider-container">
+            <label for="ballCount">小球数量: <span id="ballValue">100</span></label>
+            <input type="range" id="ballCount" min="10" max="1000" value="100" step="10">
+        </div>
+        <div class="slider-container">
+            <label for="ballSpeed">小球速度: <span id="speedValue">1</span></label>
+            <input type="range" id="ballSpeed" min="0.5" max="3" value="1" step="0.1">
+        </div>
+        <div class="slider-container">
+            <label for="probability">向右概率: <span id="probValue">0.5</span></label>
+            <input type="range" id="probability" min="0" max="1" value="0.5" step="0.05">
+        </div>
+        <button id="startBtn">开始模拟</button>
+        <button id="resetBtn">重置</button>
+        <div id="stats">
+            <p>已投放小球: <span id="ballsDropped">0</span></p>
+            <div class="chart-container">
+                <canvas id="chart"></canvas>
+            </div>
+            <p>分布情况: <span id="distribution"></span></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script>
+        // 等待资源加载
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                document.getElementById('loading').style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                }, 500);
+            }, 1000);
+        });
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x16213e);
+        scene.fog = new THREE.Fog(0x16213e, 20, 100);
+        
+        // 相机设置
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 30);
+        
+        // 渲染器设置
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        // 移除阴影相关设置
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.getElementById('container').appendChild(renderer.domElement);
+        
+        // 控制器设置
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.7;
+        controls.minDistance = 10;
+        controls.maxDistance = 50;
+        controls.maxPolarAngle = Math.PI / 2;
+        
+        // 光照设置 - 只保留基本环境光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+        
+        // 移除其他光源
+        
+        // 材质设置 - 简化材质，移除光影相关属性
+        const pegMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x4facfe
+        });
+        
+        const ballMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff5e62
+        });
+        
+        // 创建低多边形版本的球体几何体，减少渲染负担
+        const ballGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+        
+        // 全局变量
+        let pegs = [];
+        let balls = [];
+        let ballPool = []; // 小球对象池
+        let bins = [];
+        let ballsInBins = [];
+        let rowCount = 10;
+        let ballCount = 100;
+        let ballSpeed = 1;
+        let probability = 0.5;
+        let ballsDropped = 0;
+        let isSimulating = false;
+        let board;
+        let chart;
+        let lastTime = 0;
+        const maxBallsVisible = 200; // 限制同时可见的小球数量
+        // const boardMaterial = new THREE.MeshStandardMaterial({
+        const boardMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x2c3e50, 
+            transparent: true, 
+            opacity: 0.9,
+            // metalness: 0.5,
+            // roughness: 0.5
+        });
+        
+        // const binMaterial = new THREE.MeshPhysicalMaterial({ 
+        const binMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x66bb6a, 
+            transparent: true, 
+            opacity: 0.7,
+            // metalness: 0.3,
+            // roughness: 0.4,
+            // transmission: 0.2
+        });
+        
+        // 初始化图表
+        function initChart() {
+            // 如果已存在图表实例，先销毁它
+            if (chart) {
+                chart.destroy();
+            }
+            
+            const ctx = document.getElementById('chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Array.from({length: rowCount + 1}, (_, i) => i),
+                    datasets: [{
+                        label: '小球分布',
+                        data: Array(rowCount + 1).fill(0),
+                        backgroundColor: 'rgba(79, 172, 254, 0.7)',
+                        borderColor: 'rgba(0, 242, 254, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 500
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 初始化UI控件
+        document.getElementById('rows').addEventListener('input', function() {
+            rowCount = parseInt(this.value);
+            document.getElementById('rowValue').textContent = rowCount;
+        });
+        
+        document.getElementById('ballCount').addEventListener('input', function() {
+            ballCount = parseInt(this.value);
+            document.getElementById('ballValue').textContent = ballCount;
+        });
+        
+        document.getElementById('ballSpeed').addEventListener('input', function() {
+            ballSpeed = parseFloat(this.value);
+            document.getElementById('speedValue').textContent = ballSpeed;
+        });
+        
+        document.getElementById('probability').addEventListener('input', function() {
+            probability = parseFloat(this.value);
+            document.getElementById('probValue').textContent = probability;
+        });
+        
+        document.getElementById('startBtn').addEventListener('click', startSimulation);
+        document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+        
+        // 创建高尔顿板
+        function createGaltonBoard() {
+            // 清除现有的板
+            if (board) scene.remove(board);
+            
+            // 创建新的组来包含所有元素
+            board = new THREE.Group();
+            
+            // 创建背板
+            const backboardGeometry = new THREE.BoxGeometry(rowCount * 2 + 6, rowCount * 2 + 10, 0.5);
+            const backboard = new THREE.Mesh(backboardGeometry, boardMaterial);
+            backboard.position.z = -1;
+            // 移除阴影相关设置
+            // backboard.receiveShadow = true;
+            board.add(backboard);
+            
+            // 添加边框
+            const frameGeometry = new THREE.BoxGeometry(0.5, rowCount * 2 + 10, 2);
+            const leftFrame = new THREE.Mesh(frameGeometry, boardMaterial);
+            leftFrame.position.x = -(rowCount + 10) / 2;
+            // leftFrame.receiveShadow = true;
+            // leftFrame.castShadow = true;
+            board.add(leftFrame);
+            
+            const rightFrame = new THREE.Mesh(frameGeometry, boardMaterial);
+            rightFrame.position.x = (rowCount + 10) / 2;
+            // rightFrame.receiveShadow = true;
+            // rightFrame.castShadow = true;
+            board.add(rightFrame);
+            
+            // 创建钉子
+            pegs = [];
+            for (let row = 0; row < rowCount; row++) {
+                const pegsInRow = row + 1;
+                for (let i = 0; i < pegsInRow; i++) {
+                    // const pegGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+                    const pegGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+                    const peg = new THREE.Mesh(pegGeometry, pegMaterial);
+                    
+                    // 计算钉子位置
+                    const xOffset = (pegsInRow - 1) * 0.5;
+                    peg.position.x = (i - xOffset) * 2;
+                    peg.position.y = row * -1.5;
+                    // peg.castShadow = true;
+                    // peg.receiveShadow = true;
+                    
+                    // 添加钉子的发光效果
+                    // const pegGlow = new THREE.PointLight(0x4facfe, 0.5, 1);
+                    // pegGlow.position.copy(peg.position);
+                    // board.add(pegGlow);
+                    
+                    pegs.push(peg);
+                    board.add(peg);
+                }
+            }
+            
+            // 创建收集箱
+            bins = [];
+            ballsInBins = new Array(rowCount + 1).fill(0);
+            
+            for (let i = 0; i <= rowCount; i++) {
+                const binGeometry = new THREE.BoxGeometry(1.8, 5, 2);
+                const bin = new THREE.Mesh(binGeometry, binMaterial);
+                
+                const xOffset = rowCount * 0.5;
+                bin.position.x = (i - xOffset) * 2;
+                bin.position.y = -rowCount * 1.5 - 2.5;
+                // bin.castShadow = true;
+                // bin.receiveShadow = true;
+                
+                bins.push(bin);
+                board.add(bin);
+            }
+            
+            scene.add(board);
+            
+            // 更新图表
+            if (chart) {
+                chart.data.labels = Array.from({length: rowCount + 1}, (_, i) => i);
+                chart.data.datasets[0].data = Array(rowCount + 1).fill(0);
+                chart.update();
+            } else {
+                initChart();
+            }
+        }
+        
+        // 创建小球
+        function createBall() {
+            let ball;
+            
+            // 从对象池获取小球或创建新的小球
+            if (ballPool.length > 0) {
+                ball = ballPool.pop();
+                ball.visible = true;
+                ball.position.set(0, 5, 0);
+                ball.velocity.set(0, 0, 0);
+                ball.inBin = false;
+                ball.path = [];
+            } else {
+                ball = new THREE.Mesh(ballGeometry, ballMaterial);
+                ball.position.set(0, 5, 0);
+                // ball.castShadow = true;
+                // ball.receiveShadow = true;
+                
+                // 添加小球物理属性
+                ball.velocity = new THREE.Vector3(0, 0, 0);
+                ball.inBin = false;
+                ball.path = []; // 记录小球的路径
+                ball.bounceEnergy = 0.7; // 弹性系数
+                ball.friction = 0.98; // 摩擦系数
+                
+                // 随机小球颜色 - 使用更高效的方式设置颜色
+                const hue = Math.random() * 0.2 + 0.8; // 0.8-1.0 (红色到橙色范围)
+                // ball.material = ballMaterial.clone();
+                // ball.material.color.setHSL(hue, 0.8, 0.6);
+                ball.material = new THREE.MeshBasicMaterial({ color: 0xff5e62 });
+                const color = new THREE.Color();
+                color.setHSL(hue, 0.8, 0.6);
+                ball.material.color = color;
+                
+                // 减少发光效果，只在少量球上添加
+                // if (Math.random() < 0.1) {  // 只有10%的球有发光效果
+                //     const ballGlow = new THREE.PointLight(ball.material.color, 0.3, 1.5);
+                //     ballGlow.position.copy(ball.position);
+                //     ball.add(ballGlow);
+                // }
+                
+                scene.add(ball);
+            }
+            
+            // 限制同时可见的小球数量
+            if (balls.length > maxBallsVisible) {
+                const oldestBall = balls.shift();
+                if (!oldestBall.inBin) {
+                    oldestBall.visible = false;
+                    ballPool.push(oldestBall);
+                }
+            }
+            
+            balls.push(ball);
+            
+            ballsDropped++;
+            document.getElementById('ballsDropped').textContent = ballsDropped;
+            
+            return ball;
+        }
+        
+        // 更新小球位置
+        function updateBalls() {
+            const gravity = new THREE.Vector3(0, -0.05 * ballSpeed, 0);
+            const boardWidth = rowCount + 10; // 调整边界检测宽度，与挡板位置一致
+            
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                
+                if (!ball.visible || ball.inBin) {
+                    // 让小球在箱子里轻微摆动，但减少计算频率
+                    if (ball.inBin && Math.random() < 0.1) {
+                        ball.position.y += Math.sin(Date.now() * 0.003) * 0.001;
+                    }
+                    continue;
+                }
+                
+                // 应用重力
+                ball.velocity.add(gravity);
+                
+                // 应用摩擦力
+                ball.velocity.multiplyScalar(ball.friction);
+                
+                // 更新位置
+                ball.position.add(ball.velocity);
+                
+                // 只在必要时更新光源位置（如果球有子对象）
+                // if (ball.children.length > 0) {
+                //     ball.children[0].position.copy(ball.position);
+                // }
+                
+                // 优化碰撞检测 - 只检测可能碰撞的钉子
+                // 计算当前行
+                const currentRow = Math.floor(-ball.position.y / 1.5);
+                if (currentRow >= 0 && currentRow < rowCount) {
+                    const pegsInCurrentRow = currentRow + 1;
+                    const xOffset = (pegsInCurrentRow - 1) * 0.5;
+                    
+                    // 只检测附近的钉子
+                    for (let j = 0; j < pegsInCurrentRow; j++) {
+                        const pegX = (j - xOffset) * 2;
+                        // 只有当小球接近钉子时才进行详细碰撞检测
+                        if (Math.abs(ball.position.x - pegX) < 2) {
+                            const pegIndex = (currentRow * (currentRow + 1)) / 2 + j;
+                            if (pegIndex < pegs.length) {
+                                const peg = pegs[pegIndex];
+                                const distance = ball.position.distanceTo(peg.position);
+                                
+                                if (distance < 0.7) { // 小球半径 + 钉子半径
+                                    // 确定小球向左还是向右偏转
+                                    let goRight;
+                                    if (probability === 0.5) {
+                                        goRight = Math.random() < 0.5;
+                                    } else {
+                                        goRight = Math.random() < probability;
+                                    }
+                                    
+                                    // 计算碰撞后的反弹方向
+                                    const normal = new THREE.Vector3().subVectors(ball.position, peg.position).normalize();
+                                    
+                                    // 根据偏转方向调整速度
+                                    const deflectionForce = goRight ? 0.1 : -0.1;
+                                    ball.velocity.x += deflectionForce;
+                                    
+                                    // 应用反弹效果
+                                    const dot = ball.velocity.dot(normal);
+                                    normal.multiplyScalar(2 * dot);
+                                    ball.velocity.sub(normal);
+                                    
+                                    // 应用弹性系数
+                                    ball.velocity.multiplyScalar(ball.bounceEnergy);
+                                    
+                                    // 记录路径选择
+                                    ball.path.push(goRight ? 'R' : 'L');
+                                    
+                                    // 稍微弹起
+                                    ball.velocity.y = Math.abs(ball.velocity.y) * 0.3;
+                                    
+                                    // 防止多次碰撞同一个钉子
+                                    ball.position.y -= 0.2;
+                                    
+                                    // 碰撞时闪烁钉子，但减少闪烁频率
+                                    // if (Math.random() < 0.3) { // 只有30%的碰撞会导致闪烁
+                                    //     peg.material.emissiveIntensity = 0.8;
+                                    //     setTimeout(() => {
+                                    //         peg.material.emissiveIntensity = 0.2;
+                                    //     }, 100);
+                                    // }
+                                    
+                                    break; // 一次只处理一个碰撞
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 检测与边框的碰撞
+                if (ball.position.x < -boardWidth/2 + 0.5) {
+                    ball.position.x = -boardWidth/2 + 0.5;
+                    ball.velocity.x = -ball.velocity.x * ball.bounceEnergy;
+                }
+                if (ball.position.x > boardWidth/2 - 0.5) {
+                    ball.position.x = boardWidth/2 - 0.5;
+                    ball.velocity.x = -ball.velocity.x * ball.bounceEnergy;
+                }
+                
+                // 检测与收集箱的碰撞
+                if (ball.position.y < -rowCount * 1.5) {
+                    for (let j = 0; j < bins.length; j++) {
+                        const bin = bins[j];
+                        if (Math.abs(ball.position.x - bin.position.x) < 0.9) {
+                            ball.position.x = bin.position.x; // 将球对齐到箱子中心
+                            ball.position.y = bin.position.y + (Math.random() * 2 - 1); // 随机高度
+                            ball.velocity.set(0, 0, 0);
+                            ball.inBin = true;
+                            ballsInBins[j]++;
+                            
+                            // 更新图表和分布显示，但减少更新频率
+                            if (ballsInBins[j] % 5 === 0) { // 每5个球才更新一次显示
+                                updateDistributionDisplay();
+                            }
+                            
+                            // 碰撞时闪烁箱子，但减少闪烁频率
+                            // if (Math.random() < 0.3) {
+                            //     bin.material.emissive = new THREE.Color(0x2e7d32);
+                            //     setTimeout(() => {
+                            //         bin.material.emissive = new THREE.Color(0x000000);
+                            //     }, 200);
+                            // }
+                            
+                            break;
+                        }
+                    }
+                }
+                
+                // 如果小球掉出边界，回收到对象池
+                if (ball.position.y < -50) {
+                    ball.visible = false;
+                    ballPool.push(ball);
+                    balls.splice(i, 1);
+                }
+            }
+        }
+        
+        // 更新分布显示
+        function updateDistributionDisplay() {
+            let distributionText = "";
+            const maxBalls = Math.max(...ballsInBins);
+            
+            for (let i = 0; i < ballsInBins.length; i++) {
+                const count = ballsInBins[i];
+                const barLength = maxBalls > 0 ? Math.round((count / maxBalls) * 20) : 0;
+                distributionText += `${i}: ${'█'.repeat(barLength)} (${count})<br>`;
+            }
+            
+            document.getElementById('distribution').innerHTML = distributionText;
+            
+            // 更新图表
+            chart.data.datasets[0].data = [...ballsInBins];
+            chart.update();
+        }
+        
+        // 开始模拟
+        function startSimulation() {
+            if (isSimulating) return;
+            
+            resetSimulation();
+            isSimulating = true;
+            
+            let ballsCreated = 0;
+            
+            function dropBall() {
+                if (ballsCreated < ballCount && isSimulating) {
+                    createBall();
+                    ballsCreated++;
+                    setTimeout(dropBall, 100 / ballSpeed);
+                }
+            }
+            
+            dropBall();
+        }
+        
+        // 重置模拟
+        function resetSimulation() {
+            isSimulating = false;
+            
+            // 移除所有小球
+            for (const ball of balls) {
+                scene.remove(ball);
+            }
+            balls = [];
+            
+            // 重置计数
+            ballsDropped = 0;
+            document.getElementById('ballsDropped').textContent = ballsDropped;
+            
+            // 重建高尔顿板
+            createGaltonBoard();
+        }
+        
+        // 窗口大小调整
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (chart) chart.resize();
+        });
+        
+        // 初始化
+        createGaltonBoard();
+        initChart();
+        
+        // 动画循环
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            // 计算帧间隔时间，用于平滑动画
+            const delta = time - lastTime;
+            lastTime = time;
+            
+            // 只有在合理的帧率下才更新
+            if (delta < 100) { // 防止标签页不活跃时的大间隔
+                controls.update();
+                updateBalls();
+                
+                // 添加相机轻微摇晃效果，但减少计算频率
+                if (isSimulating && balls.length > 0 && Math.random() < 0.2) {
+                    camera.position.x += (Math.random() - 0.5) * 0.01;
+                    camera.position.y += (Math.random() - 0.5) * 0.01;
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+        
+        animate(0);
+    </script>
+</body>
+</html>
