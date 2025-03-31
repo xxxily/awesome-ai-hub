@@ -1,0 +1,1013 @@
+帮我使用纯前端技术写一个酷炫的打砖块游戏
+
+1、打中砖块时候要有酷炫的爆炸效果
+
+2、支持关卡，越往后的关卡越酷炫，甚至支持多点打击等效果
+
+3、支持难度等级，游戏暂停，积分统计等设置
+
+4、需支持移动设备，且移动端下可以通过重力感应来移动打击
+
+5、所有代码都放在index.html下即可
+
+
+
+好的，这是一个使用纯 HTML、CSS 和 JavaScript 实现的打砖块游戏的示例代码，它包含了你提出的大部分核心功能，并集成到了一个 `index.html` 文件中。
+
+**核心功能实现说明：**
+
+1.  **酷炫爆炸效果:** 使用了简单的粒子效果。当砖块被击中时，会在砖块位置生成多个小方块（粒子），这些粒子会向随机方向移动并逐渐消失。
+2.  **关卡支持:** 包含了简单的关卡结构 (`levels` 数组)。每个关卡可以定义不同的砖块布局。代码中预设了两个简单关卡，可以轻松扩展。更高级的效果（如多点打击）需要更复杂的逻辑，这里实现了一个基础框架。
+3.  **难度等级、暂停、积分:**
+    * **难度:** 通过 `difficulty` 对象调整球速。
+    * **暂停:** 按 "P" 键或点击暂停按钮可以暂停/继续游戏。
+    * **积分:** 实时显示得分。
+4.  **移动设备支持与重力感应:**
+    * 使用 `touchmove` 事件监听器，允许在触摸屏上拖动手指来移动挡板。
+    * 使用 `DeviceMotionEvent` API，在支持的移动设备上可以通过倾斜设备（左右倾斜）来控制挡板移动。**注意:** 重力感应可能需要在 HTTPS 环境下或需要用户授权才能工作，并且不同设备的传感器数据可能需要调整 `tiltSensitivity`。
+5.  **单文件:** 所有 HTML, CSS, JavaScript 代码都在下面的 `index.html` 文件内。
+
+**`index.html` 文件内容：**
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>酷炫打砖块</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #222;
+            font-family: 'Arial', sans-serif;
+            color: #eee;
+            overflow: hidden; /* 防止页面滚动 */
+        }
+        #gameContainer {
+            position: relative;
+            border: 3px solid #444;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            background-color: #000;
+            /* 固定Canvas大小，避免布局问题 */
+            width: 480px;
+            height: 360px;
+        }
+        canvas {
+            display: block;
+            /* 使Canvas填充容器 */
+            width: 100%;
+            height: 100%;
+        }
+        #uiContainer {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            width: 480px; /* 与Canvas宽度一致 */
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #333;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            flex-wrap: wrap; /* 允许换行 */
+        }
+        #uiContainer span, #uiContainer button, #uiContainer select {
+            margin: 5px;
+            color: #eee;
+            background: none;
+            border: none;
+        }
+        #uiContainer button, #uiContainer select {
+             padding: 8px 12px;
+             background-color: #007bff;
+             color: white;
+             border: none;
+             border-radius: 4px;
+             cursor: pointer;
+             font-size: 0.9em;
+             transition: background-color 0.3s ease;
+         }
+         #uiContainer button:hover, #uiContainer select:hover {
+             background-color: #0056b3;
+         }
+         #uiContainer button:disabled {
+             background-color: #555;
+             cursor: not-allowed;
+         }
+        #messageOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex; /* 使用 flex 布局 */
+            flex-direction: column; /* 垂直排列 */
+            justify-content: center; /* 垂直居中 */
+            align-items: center; /* 水平居中 */
+            color: #fff;
+            font-size: 2em;
+            text-align: center;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0s linear 0.5s;
+            padding: 20px;
+            box-sizing: border-box; /* 防止 padding 撑大元素 */
+        }
+        #messageOverlay.show {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease;
+        }
+        #messageOverlay button {
+             margin-top: 20px;
+             padding: 10px 20px;
+             font-size: 0.8em;
+             background-color: #28a745;
+         }
+         #messageOverlay button:hover {
+             background-color: #218838;
+         }
+    </style>
+</head>
+<body>
+
+    <div id="uiContainer">
+        <span>得分: <span id="score">0</span></span>
+        <span>关卡: <span id="level">1</span></span>
+        <span>生命: <span id="lives">3</span></span>
+        <select id="difficultySelect">
+            <option value="easy">简单</option>
+            <option value="medium" selected>中等</option>
+            <option value="hard">困难</option>
+        </select>
+        <button id="pauseBtn">暂停 (P)</button>
+        <button id="startBtn">开始游戏</button>
+    </div>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="messageOverlay">
+            <span id="messageText"></span>
+            <button id="restartBtn" style="display:none;">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.getElementById('gameContainer');
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        const livesEl = document.getElementById('lives');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const startBtn = document.getElementById('startBtn');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const messageOverlay = document.getElementById('messageOverlay');
+        const messageText = document.getElementById('messageText');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let canvasWidth = 480;
+        let canvasHeight = 360;
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+
+        // --- Game State ---
+        let gameState = 'menu'; // 'menu', 'playing', 'paused', 'gameOver', 'levelComplete', 'win'
+        let score = 0;
+        let lives = 3;
+        let currentLevel = 0; // Start from index 0
+        let particles = [];
+        let tiltSupported = false;
+        let tiltPermissionGranted = false;
+        const tiltSensitivity = 1.5; // 调整重力感应灵敏度
+
+        // --- Game Objects ---
+        const paddle = {
+            width: 80,
+            height: 12,
+            x: canvasWidth / 2 - 40,
+            y: canvasHeight - 30,
+            speed: 8,
+            dx: 0,
+            color: '#00ffff',
+            shadowColor: 'rgba(0, 255, 255, 0.7)',
+            shadowBlur: 15
+        };
+
+        const ball = {
+            radius: 8,
+            x: canvasWidth / 2,
+            y: canvasHeight - 50,
+            speed: 4, // Base speed
+            dx: 4, // Initial velocity (adjusted by difficulty)
+            dy: -4, // Initial velocity (adjusted by difficulty)
+            color: '#ff00ff',
+            shadowColor: 'rgba(255, 0, 255, 0.7)',
+            shadowBlur: 10
+        };
+
+        let bricks = [];
+        const brickInfo = {
+            rows: 5,
+            cols: 7,
+            width: 55,
+            height: 15,
+            padding: 8,
+            offsetTop: 30,
+            offsetLeft: 35,
+            colors: ['#ff5733', '#ffc300', '#36d7b7', '#3498db', '#9b59b6'] // Different colors per row
+        };
+
+        // --- Levels ---
+        const levels = [
+            // Level 1: Standard Grid
+            {
+                rows: 4, cols: 6, layout: null // null means standard grid
+            },
+            // Level 2: Grid with a gap
+            {
+                rows: 5, cols: 7, layout: [
+                    [1,1,1,1,1,1,1],
+                    [1,1,1,0,1,1,1], // 0 means no brick
+                    [1,1,1,1,1,1,1],
+                    [1,0,1,1,1,0,1],
+                    [1,1,1,1,1,1,1]
+                ]
+            },
+            // Level 3: Simple Pattern
+            {
+                rows: 6, cols: 8, layout: [
+                    [0,0,1,1,1,1,0,0],
+                    [0,1,1,1,1,1,1,0],
+                    [1,1,0,1,1,0,1,1],
+                    [1,1,1,1,1,1,1,1],
+                    [0,1,1,1,1,1,1,0],
+                    [0,0,1,1,1,1,0,0]
+                ]
+            }
+            // Add more levels here...
+            // { rows: Y, cols: X, layout: [ [..], [..] ]}
+            // You could add properties like brick types, powerups per level etc.
+        ];
+
+
+        // --- Difficulty Settings ---
+        const difficultySettings = {
+            easy: { ballSpeedMultiplier: 0.8, paddleWidthMultiplier: 1.2 },
+            medium: { ballSpeedMultiplier: 1.0, paddleWidthMultiplier: 1.0 },
+            hard: { ballSpeedMultiplier: 1.3, paddleWidthMultiplier: 0.8 }
+        };
+        let currentDifficulty = 'medium';
+
+        // --- Input Handling ---
+        let rightPressed = false;
+        let leftPressed = false;
+
+        document.addEventListener('keydown', keyDownHandler);
+        document.addEventListener('keyup', keyUpHandler);
+        document.addEventListener('mousemove', mouseMoveHandler);
+        canvas.addEventListener('touchmove', touchMoveHandler, { passive: false }); // Use passive: false to prevent default scroll
+        pauseBtn.addEventListener('click', togglePause);
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', restartGame);
+        difficultySelect.addEventListener('change', (e) => {
+            if (gameState === 'menu') {
+                currentDifficulty = e.target.value;
+                applyDifficulty(); // Apply immediately if in menu
+            } else {
+                // If game is running, maybe just store it and apply on next game start
+                console.log("Difficulty will change on next game start.");
+            }
+        });
+
+        // --- Gravity Sensor Handling ---
+        function requestTiltPermission() {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                 // iOS 13+ requires permission
+                DeviceMotionEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('devicemotion', handleTilt);
+                            tiltPermissionGranted = true;
+                            console.log("DeviceMotion permission granted.");
+                        } else {
+                            console.log("DeviceMotion permission denied.");
+                            alert("倾斜控制需要设备运动权限。");
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                 // Non-iOS 13+ or non-requestPermission browsers
+                 window.addEventListener('devicemotion', handleTilt);
+                 // Assume permission if API exists but no request function
+                 if (typeof DeviceMotionEvent !== 'undefined') {
+                     tiltPermissionGranted = true; // Tentative grant
+                     console.log("DeviceMotion event listener added (no explicit permission needed/possible).");
+                 }
+            }
+        }
+
+         function handleTilt(event) {
+             if (!tiltPermissionGranted || gameState !== 'playing') return;
+
+             // Check if rotationRate is available, otherwise use accelerationIncludingGravity
+             let tiltValue = 0;
+             if (event.rotationRate && event.rotationRate.gamma !== null) {
+                 // Prefer rotationRate.gamma for responsiveness (degrees per second)
+                 tiltValue = event.rotationRate.gamma;
+                 // May need different sensitivity scaling for rotationRate
+             } else if (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x !== null) {
+                 // Use accelerationIncludingGravity.x (m/s^2) as fallback - less ideal for direct control
+                 // Mapping might differ significantly based on device orientation
+                 // Simple mapping assuming landscape mode or specific handling:
+                 tiltValue = event.accelerationIncludingGravity.x * 2; // Adjust multiplier as needed
+             }
+
+             // Try using Gamma for orientation (more stable for tilt control)
+              if (event.gamma !== null && event.gamma !== undefined) { // event.gamma for orientation
+                 // Gamma range is typically -90 to 90 (portrait) or -180 to 180
+                 // Let's map a range of gamma (e.g., -30 to 30) to paddle movement
+                 const tiltThreshold = 3; // Degrees threshold to start moving
+                 const maxTilt = 30; // Maximum effective tilt angle
+
+                 if (Math.abs(event.gamma) > tiltThreshold) {
+                    let relativeTilt = Math.max(-maxTilt, Math.min(maxTilt, event.gamma));
+                    // Normalize tilt to -1 to 1 range based on maxTilt
+                    let moveFactor = relativeTilt / maxTilt;
+                     paddle.dx = moveFactor * paddle.speed * tiltSensitivity; // Scale speed
+                 } else {
+                     paddle.dx = 0; // No movement if tilt is minimal
+                 }
+             } else {
+                 // Fallback or if gamma is not suitable, use the previously calculated tiltValue
+                  paddle.dx = tiltValue * tiltSensitivity * 0.1; // Adjust scaling if using acceleration/rotation rate
+             }
+
+
+             // --- This is a simplified alternative using just acceleration.x ---
+             // const rawTilt = event.accelerationIncludingGravity.x;
+             // // Simple threshold and scaling: Adjust these values heavily based on testing
+             // const threshold = 0.5;
+             // if (Math.abs(rawTilt) > threshold) {
+             //     // Map the tilt value (-10 to 10 approx) to paddle speed
+             //     paddle.dx = Math.sign(rawTilt) * paddle.speed * (Math.abs(rawTilt) / 10) * tiltSensitivity;
+             // } else {
+             //      paddle.dx = 0; // Stop if tilt is small
+             // }
+         }
+
+
+        function keyDownHandler(e) {
+            if (e.key === 'Right' || e.key === 'ArrowRight') {
+                rightPressed = true;
+            } else if (e.key === 'Left' || e.key === 'ArrowLeft') {
+                leftPressed = true;
+            } else if ((e.key === 'p' || e.key === 'P') && (gameState === 'playing' || gameState === 'paused')) {
+                togglePause();
+            }
+        }
+
+        function keyUpHandler(e) {
+            if (e.key === 'Right' || e.key === 'ArrowRight') {
+                rightPressed = false;
+            } else if (e.key === 'Left' || e.key === 'ArrowLeft') {
+                leftPressed = false;
+            }
+        }
+
+        function mouseMoveHandler(e) {
+            // Only control paddle if not using tilt controls effectively
+             if (gameState === 'playing' && !tiltPermissionGranted) { // Or add a toggle setting
+                const relativeX = e.clientX - gameContainer.offsetLeft - (gameContainer.offsetWidth - canvasWidth) / 2; // Adjust for container centering/padding
+                 if (relativeX > 0 && relativeX < canvasWidth) {
+                     paddle.x = relativeX - paddle.width / 2;
+                     // Clamp paddle position
+                    paddle.x = Math.max(0, Math.min(canvasWidth - paddle.width, paddle.x));
+                 }
+            }
+        }
+
+         function touchMoveHandler(e) {
+             // Prevent default scrolling/zooming behavior
+             e.preventDefault();
+             if (gameState === 'playing') {
+                 if (e.touches.length > 0) {
+                     const touch = e.touches[0];
+                     const relativeX = touch.clientX - gameContainer.offsetLeft - (gameContainer.offsetWidth - canvasWidth) / 2; // Adjust for container centering/padding
+                     paddle.x = relativeX - paddle.width / 2;
+                     // Clamp paddle position
+                     paddle.x = Math.max(0, Math.min(canvasWidth - paddle.width, paddle.x));
+                 }
+             }
+         }
+
+
+        // --- Drawing Functions ---
+        function drawPaddle() {
+            ctx.beginPath();
+            ctx.rect(paddle.x, paddle.y, paddle.width, paddle.height);
+            // Apply gradient for a cooler look
+            const gradient = ctx.createLinearGradient(paddle.x, paddle.y, paddle.x + paddle.width, paddle.y);
+            gradient.addColorStop(0, '#00fefe');
+            gradient.addColorStop(0.5, paddle.color);
+            gradient.addColorStop(1, '#00fefe');
+            ctx.fillStyle = gradient;
+             // Add shadow for depth
+            ctx.shadowColor = paddle.shadowColor;
+            ctx.shadowBlur = paddle.shadowBlur;
+            ctx.fill();
+            ctx.closePath();
+             // Reset shadow for other elements
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            // Radial gradient for a sphere effect
+            const gradient = ctx.createRadialGradient(ball.x, ball.y, ball.radius * 0.1, ball.x, ball.y, ball.radius);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.7, ball.color);
+            gradient.addColorStop(1, ball.color);
+            ctx.fillStyle = gradient;
+            // Add shadow
+            ctx.shadowColor = ball.shadowColor;
+            ctx.shadowBlur = ball.shadowBlur;
+            ctx.fill();
+            ctx.closePath();
+             // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        }
+
+        function createBricks(levelIndex) {
+            bricks = [];
+            const levelData = levels[levelIndex];
+            if (!levelData) {
+                console.error("Level data not found for index:", levelIndex);
+                return; // Or handle win condition
+            }
+
+            const levelLayout = levelData.layout;
+            const numRows = levelData.rows;
+            const numCols = levelData.cols;
+            const baseColorIndex = levelIndex % brickInfo.colors.length; // Cycle colors per level
+
+            for (let c = 0; c < numCols; c++) {
+                bricks[c] = [];
+                for (let r = 0; r < numRows; r++) {
+                    // Check layout if it exists, otherwise assume brick exists (status 1)
+                    const brickExists = levelLayout ? (levelLayout[r]?.[c] === 1) : true;
+
+                    if (brickExists) {
+                         const brickX = c * (brickInfo.width + brickInfo.padding) + brickInfo.offsetLeft;
+                         const brickY = r * (brickInfo.height + brickInfo.padding) + brickInfo.offsetTop;
+                         const colorIndex = (baseColorIndex + r) % brickInfo.colors.length; // Vary color per row
+                         bricks[c][r] = {
+                             x: brickX,
+                             y: brickY,
+                             width: brickInfo.width,
+                             height: brickInfo.height,
+                             status: 1, // 1: visible, 0: broken
+                             color: brickInfo.colors[colorIndex],
+                             points: (numRows - r) * 10 // More points for higher rows
+                         };
+                    } else {
+                        // If layout defines no brick, set status to 0 or skip
+                        bricks[c][r] = { status: 0 };
+                    }
+                }
+            }
+        }
+
+
+        function drawBricks() {
+            bricks.forEach(column => {
+                column.forEach(brick => {
+                    if (brick.status === 1) {
+                        ctx.beginPath();
+                        ctx.rect(brick.x, brick.y, brickInfo.width, brickInfo.height);
+                        // Add a subtle 3D effect or gradient
+                        const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x, brick.y + brickInfo.height);
+                        gradient.addColorStop(0, brick.color);
+                        gradient.addColorStop(1, chroma(brick.color).darken(0.6).hex()); // Darken color for bottom edge
+                        ctx.fillStyle = gradient;
+                        ctx.fill();
+                        ctx.closePath();
+
+                        // Optional: Add a slight border
+                        ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(brick.x, brick.y, brickInfo.width, brickInfo.height);
+                    }
+                });
+            });
+        }
+
+         // --- Particle System for Explosions ---
+         function createExplosion(x, y, color) {
+             const particleCount = 20; // Number of particles per explosion
+             const particleSize = 3;
+             const maxLife = 30; // Frames the particle lives
+             const particleSpeed = 2;
+
+             for (let i = 0; i < particleCount; i++) {
+                 particles.push({
+                     x: x, // Start at brick center
+                     y: y,
+                     size: Math.random() * particleSize + 1,
+                     color: chroma(color).brighten(Math.random() * 0.5).hex(), // Vary brightness
+                     life: maxLife,
+                     dx: (Math.random() - 0.5) * particleSpeed * 2, // Random direction
+                     dy: (Math.random() - 0.5) * particleSpeed * 2,
+                     gravity: 0.05 // Slight downward pull
+                 });
+             }
+         }
+
+         function updateParticles() {
+             for (let i = particles.length - 1; i >= 0; i--) {
+                 const p = particles[i];
+                 p.x += p.dx;
+                 p.y += p.dy;
+                 p.dy += p.gravity; // Apply gravity
+                 p.life--;
+
+                 // Remove particle if life is over
+                 if (p.life <= 0) {
+                     particles.splice(i, 1);
+                 }
+             }
+         }
+
+         function drawParticles() {
+             particles.forEach(p => {
+                 ctx.beginPath();
+                 // Fade out effect
+                 ctx.globalAlpha = Math.max(0, p.life / 30); // Use initial life or a fixed value
+                 ctx.rect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+                 ctx.fillStyle = p.color;
+                 ctx.fill();
+                 ctx.closePath();
+             });
+              // Reset global alpha
+             ctx.globalAlpha = 1.0;
+         }
+
+
+        // --- Game Logic ---
+        function collisionDetection() {
+            // Ball-Brick Collision
+            let allBricksBroken = true;
+            for (let c = 0; c < brickInfo.cols; c++) {
+                for (let r = 0; r < brickInfo.rows; r++) {
+                    const brick = bricks[c]?.[r]; // Use optional chaining for safety
+                    if (brick && brick.status === 1) {
+                        allBricksBroken = false; // Found an active brick
+                         if (ball.x + ball.radius > brick.x &&
+                            ball.x - ball.radius < brick.x + brickInfo.width &&
+                            ball.y + ball.radius > brick.y &&
+                            ball.y - ball.radius < brick.y + brickInfo.height) {
+
+                            // Collision detected
+                            ball.dy = -ball.dy; // Reverse vertical direction
+                            brick.status = 0; // Break the brick
+                            score += brick.points;
+                            updateUIScore();
+
+                            // Trigger explosion effect at brick center
+                            createExplosion(brick.x + brickInfo.width / 2, brick.y + brickInfo.height / 2, brick.color);
+
+                            // Simple side collision check (could be more precise)
+                            // If ball center is near brick vertical edges more than horizontal
+                            let overlapX = (ball.radius + brickInfo.width/2) - Math.abs((ball.x) - (brick.x+brickInfo.width/2));
+                            let overlapY = (ball.radius + brickInfo.height/2) - Math.abs((ball.y) - (brick.y+brickInfo.height/2));
+
+                            // This logic is basic, better physics needed for perfect side hits
+                            if (overlapX < overlapY && overlapX > 0) {
+                                ball.dx = -ball.dx; // Also reverse horizontal if looks like a side hit
+                                // Correct the vertical flip if it was primarily a side hit
+                                ball.dy = -ball.dy; // Re-flip vertical if side hit logic is applied
+                            }
+                        }
+                    }
+                }
+            }
+              // Check for level complete after iterating through all bricks
+             if (allBricksBroken && bricks.length > 0) { // Ensure bricks were initialized
+                 levelComplete();
+             }
+        }
+
+        function movePaddle() {
+            // Keyboard control
+            if (rightPressed) {
+                paddle.x += paddle.speed;
+            } else if (leftPressed) {
+                paddle.x -= paddle.speed;
+            }
+
+            // Tilt control (updates paddle.dx)
+             if (tiltPermissionGranted) {
+                 paddle.x += paddle.dx;
+             }
+
+            // Keep paddle within bounds
+            paddle.x = Math.max(0, Math.min(canvasWidth - paddle.width, paddle.x));
+
+            // Reset dx if using tilt, as handleTilt sets it per frame
+             // if (tiltPermissionGranted) {
+             //     paddle.dx = 0; // Reset dx unless tilt is active in the next frame
+             // }
+        }
+
+        function moveBall() {
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Wall collision (left/right)
+            if (ball.x + ball.radius > canvasWidth || ball.x - ball.radius < 0) {
+                ball.dx = -ball.dx;
+                // Play wall bounce sound (optional)
+            }
+
+            // Wall collision (top)
+            if (ball.y - ball.radius < 0) {
+                ball.dy = -ball.dy;
+                 // Play wall bounce sound (optional)
+            }
+
+            // Paddle collision
+            if (ball.y + ball.radius > paddle.y &&
+                ball.y - ball.radius < paddle.y + paddle.height && // Ensure ball isn't already past paddle
+                ball.x + ball.radius > paddle.x &&
+                ball.x - ball.radius < paddle.x + paddle.width)
+            {
+                 // Prevent sticking: move ball slightly above paddle
+                 ball.y = paddle.y - ball.radius;
+
+                 // Calculate hit position relative to paddle center (-1 to 1)
+                 let collidePoint = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+
+                 // Calculate bounce angle (simple model) - Max angle around 60 degrees
+                 let angle = collidePoint * (Math.PI / 3); // Max deflection ~60 degrees
+
+                 // Update ball velocity based on angle and speed
+                 // Ensure dy is always negative (upwards) after paddle hit
+                 ball.dx = ball.speed * Math.sin(angle);
+                 ball.dy = -ball.speed * Math.cos(angle);
+
+                 // Ensure minimum vertical speed to prevent horizontal lock
+                 const minDY = -ball.speed * Math.cos(Math.PI / 3); // Min speed at max angle
+                 if (Math.abs(ball.dy) < Math.abs(minDY * 0.5)) { // Ensure some vertical component
+                    ball.dy = Math.sign(ball.dy) * Math.abs(minDY * 0.5);
+                 }
+
+
+                 // Play paddle bounce sound (optional)
+            }
+
+            // Floor collision (lose life)
+            if (ball.y + ball.radius > canvasHeight) {
+                loseLife();
+            }
+        }
+
+        function loseLife() {
+            lives--;
+            updateUILives();
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                // Reset ball and paddle position
+                resetBallPaddle();
+                // Briefly pause or show message?
+                showMessage("生命 -1", 1000); // Show message for 1 second
+            }
+        }
+
+        function gameOver() {
+            gameState = 'gameOver';
+            showMessage(`游戏结束<br>最终得分: ${score}`, 0, true); // Show indefinitely with restart button
+            pauseBtn.disabled = true;
+            // Stop tilt listening? Or just rely on gameState check
+        }
+
+        function levelComplete() {
+             gameState = 'levelComplete';
+             currentLevel++;
+             if (currentLevel >= levels.length) {
+                 gameWin();
+             } else {
+                 showMessage(`关卡 ${currentLevel} 完成!`, 2000); // Show for 2 seconds
+                 setTimeout(() => {
+                     startNextLevel();
+                 }, 2000); // Wait before starting next level
+             }
+         }
+
+         function gameWin() {
+             gameState = 'win';
+             showMessage(`恭喜通关!<br>最终得分: ${score}`, 0, true); // Show indefinitely with restart
+             pauseBtn.disabled = true;
+         }
+
+
+        function startNextLevel() {
+            updateUILevel();
+            resetBallPaddle();
+            createBricks(currentLevel);
+            applyDifficulty(); // Re-apply difficulty settings (e.g., ball speed might increase implicitly)
+            gameState = 'playing';
+             // Ensure controls are enabled
+             pauseBtn.disabled = false;
+             if (!tiltPermissionGranted) paddle.dx = 0; // Reset dx if not using tilt
+             rightPressed = false; // Reset key states
+             leftPressed = false;
+             // Resume game loop if needed (requestAnimationFrame handles this)
+        }
+
+        function resetBallPaddle() {
+            paddle.x = canvasWidth / 2 - paddle.width / 2;
+            ball.x = canvasWidth / 2;
+            ball.y = paddle.y - 30; // Start slightly above paddle
+            // Reset ball direction based on difficulty speed
+            const speed = ball.speed; // Use the current speed set by difficulty
+            ball.dx = (Math.random() < 0.5 ? 1 : -1) * speed * 0.707; // Start at 45 degrees
+            ball.dy = -speed * 0.707;
+        }
+
+        function applyDifficulty() {
+             const settings = difficultySettings[currentDifficulty];
+             // Adjust ball speed - recalculate dx/dy to maintain direction but change magnitude
+             const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+             const baseSpeed = difficultySettings['medium'].ballSpeedMultiplier * 4; // Base speed reference
+             const targetSpeed = baseSpeed * settings.ballSpeedMultiplier;
+             ball.speed = targetSpeed; // Store the target speed
+
+            // Only adjust dx/dy if the ball is currently moving (not at reset)
+             if (currentSpeed > 0.1) { // Check if ball has speed
+                 const ratio = targetSpeed / currentSpeed;
+                 ball.dx *= ratio;
+                 ball.dy *= ratio;
+             } else {
+                // If ball is being reset, apply speed during reset
+                 resetBallPaddle(); // Reset applies speed
+             }
+
+
+             // Adjust paddle width
+             const baseWidth = 80; // Base width reference
+             paddle.width = baseWidth * settings.paddleWidthMultiplier;
+             paddle.x = Math.max(0, Math.min(canvasWidth - paddle.width, paddle.x)); // Recenter if needed
+
+             console.log(`Difficulty set to ${currentDifficulty}. Ball Speed: ${ball.speed.toFixed(2)}, Paddle Width: ${paddle.width}`);
+         }
+
+
+        function togglePause() {
+            if (gameState === 'playing') {
+                gameState = 'paused';
+                pauseBtn.textContent = '继续 (P)';
+                showMessage("游戏已暂停", 0); // Show indefinitely until resume
+            } else if (gameState === 'paused') {
+                gameState = 'playing';
+                pauseBtn.textContent = '暂停 (P)';
+                hideMessage();
+                // Resume game loop (requestAnimationFrame handles this automatically)
+            }
+        }
+
+        function updateUI() {
+             scoreEl.textContent = score;
+             levelEl.textContent = currentLevel + 1; // Display 1-based level
+             livesEl.textContent = lives;
+         }
+         function updateUIScore() { scoreEl.textContent = score; }
+         function updateUILevel() { levelEl.textContent = currentLevel + 1; }
+         function updateUILives() { livesEl.textContent = lives; }
+
+
+        function showMessage(text, duration = 0, showRestart = false) {
+            messageText.innerHTML = text; // Use innerHTML to allow <br> tags
+            messageOverlay.classList.add('show');
+             restartBtn.style.display = showRestart ? 'inline-block' : 'none';
+
+            if (duration > 0) {
+                setTimeout(hideMessage, duration);
+            }
+        }
+
+        function hideMessage() {
+            messageOverlay.classList.remove('show');
+             restartBtn.style.display = 'none'; // Ensure restart button is hidden
+        }
+
+        function drawMenu() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            ctx.fillStyle = '#333';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            ctx.font = "30px Arial";
+            ctx.fillStyle = "#00ffff";
+            ctx.textAlign = "center";
+            ctx.fillText("酷炫打砖块", canvasWidth / 2, canvasHeight / 2 - 40);
+            ctx.font = "16px Arial";
+             ctx.fillStyle = "#eee";
+             ctx.fillText("选择难度并点击开始", canvasWidth / 2, canvasHeight / 2);
+             ctx.fillText("控制: 左右箭头 / 鼠标 / 触摸 / 倾斜设备", canvasWidth / 2, canvasHeight / 2 + 30);
+             ctx.fillText("P 键: 暂停/继续", canvasWidth / 2, canvasHeight / 2 + 60);
+        }
+
+        function startGame() {
+            if (gameState === 'menu' || gameState === 'gameOver' || gameState === 'win') {
+                // Reset game state for a new game
+                score = 0;
+                lives = 3;
+                currentLevel = 0; // Start from level 1 (index 0)
+                particles = [];
+                updateUI();
+                hideMessage();
+
+                 // Apply selected difficulty
+                 currentDifficulty = difficultySelect.value;
+                 applyDifficulty();
+
+                 // Initialize first level
+                 createBricks(currentLevel);
+                 resetBallPaddle(); // Position ball/paddle and set initial velocity based on difficulty
+
+                 gameState = 'playing';
+                 startBtn.disabled = true; // Disable start during play
+                 pauseBtn.disabled = false;
+                 difficultySelect.disabled = true; // Disable difficulty change during game
+
+                 // Request tilt permission if applicable and not already granted/denied
+                 if ('DeviceMotionEvent' in window && !tiltPermissionGranted) {
+                     // Optionally, trigger permission request on start button click
+                     // Be mindful of user experience, maybe ask only once or provide a separate button
+                     // For simplicity here, we attempt to add the listener directly or via request.
+                     // A dedicated button might be better UX.
+                     console.log("Attempting to enable tilt controls...");
+                     requestTiltPermission();
+                 } else if (tiltPermissionGranted) {
+                     console.log("Tilt controls previously enabled.");
+                 } else {
+                     console.log("Tilt controls not supported or permission request mechanism unavailable.");
+                 }
+
+
+                 // Start the main game loop
+                 gameLoop();
+            }
+        }
+
+         function restartGame() {
+             // This is essentially the same as startGame, but called from the message overlay button
+             startGame();
+         }
+
+        // --- Main Game Loop ---
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            // Calculate delta time (optional, but good for frame-rate independence)
+            // const deltaTime = timestamp - lastTime;
+            // lastTime = timestamp;
+
+            if (gameState === 'playing') {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+                // Update game objects
+                movePaddle();
+                moveBall();
+                updateParticles(); // Update particle positions and life
+
+                // Draw game objects
+                drawBricks();
+                drawPaddle();
+                drawBall();
+                drawParticles(); // Draw active particles
+
+                // Collision detection
+                collisionDetection(); // Check ball-brick, includes level complete check
+
+            } else if (gameState === 'paused') {
+                // Optionally draw a semi-transparent overlay or just freeze frame
+                // Message overlay handles the text indication
+            } else if (gameState === 'menu') {
+                drawMenu();
+                 startBtn.disabled = false;
+                 pauseBtn.disabled = true;
+                 difficultySelect.disabled = false;
+            } else if (gameState === 'gameOver' || gameState === 'win' || gameState === 'levelComplete') {
+                 // Game loop stops updating logic, message overlay is shown
+                 // Optionally draw the final state behind the message
+                  startBtn.disabled = false; // Allow restarting
+                  pauseBtn.disabled = true;
+                  difficultySelect.disabled = false; // Allow changing for next game
+            }
+
+            // Request next frame
+            // Only continue looping if not in a final state that requires user action (like menu/game over)
+             if (gameState !== 'gameOver' && gameState !== 'win' && gameState !== 'menu') {
+                requestAnimationFrame(gameLoop);
+            } else if (gameState === 'menu') {
+                 requestAnimationFrame(gameLoop); // Keep drawing menu until start
+            }
+            // For gameOver/win, the loop effectively stops here until startGame/restartGame is called
+        }
+
+        // --- Initialization ---
+        function init() {
+             // Add Chroma.js library dynamically if needed for color manipulation
+             if (typeof chroma !== 'function') {
+                 const script = document.createElement('script');
+                 script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js'; // Use a CDN
+                 script.onload = () => {
+                     console.log('Chroma.js loaded.');
+                     // You might need to redraw or reinitialize things that depend on chroma here
+                      drawMenu(); // Redraw menu once chroma is loaded if needed
+                 };
+                 script.onerror = () => console.error('Failed to load Chroma.js');
+                 document.head.appendChild(script);
+             } else {
+                  drawMenu(); // Draw initial menu screen if chroma already loaded
+             }
+
+             // Set initial UI states
+             pauseBtn.disabled = true;
+             difficultySelect.value = currentDifficulty; // Set dropdown to default
+             hideMessage(); // Ensure message overlay is hidden initially
+             updateUI(); // Set initial score/level/lives display
+
+             // Check for Device Motion support
+             if ('DeviceMotionEvent' in window) {
+                 tiltSupported = true;
+                 console.log("Device Motion is supported by this browser.");
+                 // Don't request permission until user interacts (e.g., clicks start)
+             } else {
+                 console.log("Device Motion is NOT supported by this browser.");
+             }
+
+             // Don't start gameLoop immediately, wait for Start button
+             // requestAnimationFrame(gameLoop); // Start loop only after 'Start Game'
+        }
+
+        // Load Chroma.js and then initialize the game
+        const chromaScript = document.createElement('script');
+        chromaScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/chroma-js/2.4.2/chroma.min.js';
+        chromaScript.integrity = 'sha512-Ty0ZWFOF5ergsJhOpGT8U9sGxo9TmkS5fGlPjQNWwjz5dkK5GldURH/g7uhN/GTeh5fc5/2gxgk9FnZspL96mg=='; // SRI for security
+        chromaScript.crossOrigin = 'anonymous';
+        chromaScript.referrerPolicy = 'no-referrer';
+        chromaScript.onload = init; // Call init() after Chroma.js is loaded
+        chromaScript.onerror = () => {
+            console.error('Critical Error: Failed to load Chroma.js. Some visual effects might be missing.');
+            // Provide fallback colors or simplified drawing if chroma fails
+            // For now, we'll proceed, but colors might be basic.
+            // You could redefine brickInfo.colors and particle colors here with basic hex codes.
+            init(); // Still try to init the game
+        };
+        document.head.appendChild(chromaScript);
+
+    </script>
+</body>
+</html>
+```
+
+**如何使用:**
+
+1.  **保存:** 将上面的全部代码复制并粘贴到一个文本文件中。
+2.  **命名:** 将该文件保存为 `index.html`。
+3.  **打开:** 用你的网页浏览器（如 Chrome, Firefox, Safari, Edge）打开这个 `index.html` 文件。
+
+**进一步改进和注意事项:**
+
+* **酷炫效果增强:**
+    * 可以使用更复杂的粒子效果（不同的形状、大小、生命周期、物理效果如旋转、弹跳）。
+    * 添加屏幕震动效果（通过轻微移动 Canvas 或 `body` 的 `transform`）。
+    * 给球和挡板添加光晕或轨迹效果（使用 `ctx.shadowBlur` 或绘制半透明的先前位置）。
+    * 砖块破碎时可以播放简短的 CSS 动画或更复杂的 Canvas 动画。
+* **多点打击/Power-ups:** 需要在 `collisionDetection` 中检测特定砖块，然后修改游戏状态，例如：
+    * 生成第二个球（或更多），需要将 `ball` 变成一个数组 `balls`，并更新所有相关的绘制和移动逻辑。
+    * 临时增大挡板宽度。
+    * 让球穿透砖块等。
+* **关卡设计:** `levels` 数组可以包含更复杂的布局，甚至可以定义特殊砖块（如需要多次打击的砖块、不可破坏的砖块、掉落道具的砖块）。
+* **音效:** 添加简单的音效（球弹跳、砖块破碎、过关、游戏结束）可以极大提升游戏体验。可以使用 Web Audio API。
+* **性能优化:** 对于非常多的粒子或复杂的关卡，可能需要优化绘图和碰撞检测逻辑。
+* **重力感应调试:** 不同设备的传感器数据和浏览器实现可能不同，`tiltSensitivity` 和 `handleTilt` 函数中的映射逻辑需要仔细测试和调整。确保在 HTTPS 环境下测试 iOS 设备。可能需要为用户提供一个校准或灵敏度设置选项。
+* **代码组织:** 对于更大型的游戏，将 JavaScript 代码分离到单独的 `.js` 文件中会更易于维护，但这违背了“所有代码都在 index.html”的要求。
+* **库依赖:** 代码中引入了 `Chroma.js` 来方便地处理颜色（变亮、变暗）。如果你不想依赖外部库，需要手动实现颜色计算或使用预定义的颜色。
+
+这个示例提供了一个坚实的基础，你可以基于它进行扩展和定制，使其更加“酷炫”。
+
+
+
