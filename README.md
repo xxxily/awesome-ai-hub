@@ -28,5 +28,6 @@ ai related works collection
 | Name        | Prompt | Model | Link                                  | Completeness | Notes |
 |-------------|--------|-------|---------------------------------------|-------|------|
 | 3D魔方  | [content](https://awesome-ai-hub.anzz.top/web/game/3dMagicCube/gemini/README.md) | gemini-2.5-pro-exp-03-25 | [链接](https://awesome-ai-hub.anzz.top/web/game/3dMagicCube/gemini/index.html) | ★★★☆☆ | - |
-| 3D高尔顿板模拟器  | [content](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/README.md) | gemini-2.5-pro-exp-03-25 | [链接](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/index.html) | ☆☆☆☆☆ | 不可用 |
+| 3D高尔顿板模拟器  | [content](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/README01.md) | gemini-2.5-pro-exp-03-25 | [链接](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/index01.html) | ☆☆☆☆☆ | 不可用 |
+| 高尔顿板模拟器 - 2D  | [content](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/README.md) | gemini-2.5-pro-exp-03-25 | [链接](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/gemini_pro_2.5/index.html) | ★★★★★ | - |
 | 酷炫打砖块  | [content](https://awesome-ai-hub.anzz.top/web/game/brick-breaker/gemini/README.md) | gemini-2.5-pro-exp-03-25 | [链接](https://awesome-ai-hub.anzz.top/web/game/brick-breaker/gemini/index.html) | ★★★★☆ | - |

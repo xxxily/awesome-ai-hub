@@ -1,820 +1,774 @@
-请使用3dweb技术，帮我创建制作一个高尔顿板模拟器，更直观地理解概率、统计、正态分布、大数法则、二项分布等抽象数学概念
+请使用前端技术，帮我创建制作一个高尔顿板模拟器，以便可以更直观地理解概率、统计、正态分布、大数法则、二项分布等抽象数学概念
 
-好的，使用 3D Web 技术创建一个高尔顿板（Galton Board）模拟器是一个非常棒的主意！这确实能将抽象的数学概念具象化，变得直观易懂。
+注意：
 
-下面是创建这样一个模拟器的技术选型、实现步骤和关键点的概述：
+1、所有代码都在index.html上
 
-**核心目标：**
+2、通过图表自动统计和显示模拟结果
 
-1.  **可视化：** 在 3D 空间中展示小球穿过钉板并落入底部槽中的过程。
-2.  **交互性：** 用户可以控制小球的数量、下落速度、甚至可能调整钉板的层数。
-3.  **数据呈现：** 实时显示底部各槽中小球的数量分布（柱状图），并与理论上的二项分布/正态分布曲线进行对比。
-4.  **概念解释：** 通过模拟过程和结果，帮助理解相关数学概念。
+3、页面需要进行移动端适配
 
-**技术选型 (Tech Stack):**
+4、确保移动端下控制面板和图表统计结果面板不会挡住模拟器的显示和相关操作
 
-1.  **3D 渲染引擎 (必需):**
-    *   **Three.js:** 最流行、社区庞大、文档丰富、易于上手。非常适合这个项目。
-    *   **Babylon.js:** 另一个强大的选择，由微软支持，功能全面，对 PBR（物理 기반 渲染）支持良好。
-    *   *推荐：* **Three.js** 因其广泛的应用和丰富的学习资源，可能是更便捷的选择。
-
-2.  **物理引擎 (必需):**
-    *   **Cannon-es:** Three.js 的一个流行物理引擎搭档，纯 JavaScript 实现，相对容易集成。 (Cannon.js 的现代维护分支)
-    *   **Rapier:** 基于 Rust 编译到 WebAssembly，性能非常高，功能强大。
-    *   **Ammo.js:** Bullet 物理引擎的 WebAssembly 移植版，功能强大但集成可能稍复杂。
-    *   *推荐：* **Cannon-es** 或 **Rapier**。Cannon-es 更易上手，Rapier 性能更好，尤其是在小球数量很多时。
-
-3.  **用户界面 (UI) & 控制 (可选但推荐):**
-    *   **HTML/CSS/JavaScript:** 用于创建按钮（开始、重置）、滑块（控制小球数量、速度）、信息显示区域。
-    *   **UI 框架 (可选):** 如 Vue.js, React, Svelte 或简单的库如 dat.GUI 可以简化 UI 开发。
-
-4.  **图表库 (用于显示分布):**
-    *   **Chart.js:** 简单易用，适合绘制柱状图和曲线图。
-    *   **D3.js:** 功能极其强大，但学习曲线较陡峭。
-    *   **Plotly.js:** 科学绘图功能强大。
-    *   *推荐：* **Chart.js** 对于这个需求来说足够且易于集成。
-
-**实现步骤:**
-
-1.  **环境搭建:**
-    *   创建项目文件夹，设置 HTML 文件 (`index.html`)、CSS 文件 (`style.css`) 和 JavaScript 主文件 (`main.js`)。
-    *   引入选择的 3D 引擎 (Three.js) 和物理引擎 (Cannon-es/Rapier) 库。可以通过 CDN 或 npm/yarn 安装。
-    *   引入图表库 (Chart.js)。
-
-2.  **创建 3D 场景:**
-    *   使用 Three.js 初始化场景 (`Scene`)、相机 (`PerspectiveCamera`)、渲染器 (`WebGLRenderer`)。
-    *   添加光源 (`AmbientLight`, `DirectionalLight`)。
-    *   添加相机控制器 (`OrbitControls`) 以便用户可以旋转和缩放观察视角。
-
-3.  **构建高尔顿板模型 (视觉与物理):**
-    *   **视觉模型 (Three.js):**
-        *   创建背景板 (`PlaneGeometry`)。
-        *   创建钉子 (`CylinderGeometry` 或 `SphereGeometry`)，并按照等腰三角形排列。
-        *   创建底部的分隔板和收集槽 (`BoxGeometry`)。
-        *   为这些物体添加材质 (`MeshStandardMaterial` 或 `MeshBasicMaterial`)。
-    *   **物理模型 (Cannon-es/Rapier):**
-        *   初始化物理世界 (`CANNON.World` 或 `RAPIER.World`)，设置重力。
-        *   为钉子、背景板、分隔板创建**静态**物理体 (`CANNON.Body` / `RAPIER.RigidBodyDesc.newStatic()`)，形状要与视觉模型大致对应 (e.g., `CANNON.Cylinder`, `CANNON.Plane`, `CANNON.Box` / `RAPIER.ColliderDesc.cylinder()`, `RAPIER.ColliderDesc.cuboid()`)。确保物理体的位置与视觉模型匹配。
-
-4.  **创建小球 (视觉与物理):**
-    *   **视觉模型 (Three.js):** 创建小球的几何体 (`SphereGeometry`) 和材质。
-    *   **物理模型 (Cannon-es/Rapier):**
-        *   为小球创建**动态**物理体 (`CANNON.Body` / `RAPIER.RigidBodyDesc.newDynamic()`)，赋予质量 (`mass`) 和球形碰撞体 (`CANNON.Sphere` / `RAPIER.ColliderDesc.ball()`)。
-        *   设置物理材质 (`CANNON.Material`) 并定义小球与钉子、板之间的**碰撞属性**（摩擦力 `friction`、弹性 `restitution` - 这个很重要，影响小球弹跳行为）。
-
-5.  **模拟循环 (Animation Loop):**
-    *   使用 `requestAnimationFrame` 创建主循环。
-    *   在每一帧：
-        *   更新物理世界 (`world.step()`)。
-        *   遍历所有**活动**的小球（视觉对象）。
-        *   将其位置 (`position`) 和旋转 (`quaternion`) 更新为对应物理体的位置和旋转。
-        *   渲染 Three.js 场景 (`renderer.render(scene, camera)`)。
-
-6.  **小球下落逻辑:**
-    *   创建一个函数 `dropBall()`，用于在顶部的特定位置（或略带随机偏移）创建新的小球（视觉+物理对象）并添加到场景和物理世界中。
-    *   通过 UI 控制（如按钮点击或定时器）调用 `dropBall()`。
-
-7.  **底部槽计数:**
-    *   **方法一 (碰撞检测):** 在每个槽底部设置触发器区域（特殊的静态物理体，设置为 `isTrigger=true` 或类似属性）。监听碰撞事件，当小球进入某个槽的触发区域时，增加该槽的计数，并将该小球从模拟中移除（或设为静态）以提高性能。
-    *   **方法二 (位置检测):** 当小球落到底部区域（Y 坐标低于某个阈值）且速度很慢时，判断其 X 坐标属于哪个槽的范围，然后增加计数并移除/冻结小球。
-    *   维护一个数组 `binCounts` 来存储每个槽的小球数量。
-
-8.  **数据可视化 (Chart.js):**
-    *   在 HTML 中创建一个 `<canvas>` 元素用于绘制图表。
-    *   使用 Chart.js 初始化一个柱状图 (`type: 'bar'`)。
-    *   图表的 `data.labels` 设置为槽的编号 (e.g., "-3", "-2", "-1", "0", "1", "2", "3")。
-    *   图表的 `data.datasets[0].data` 绑定到 `binCounts` 数组。
-    *   在模拟过程中（例如每隔一段时间或每次有小球落入槽中），调用 `chart.update()` 来更新图表显示。
-
-9.  **绘制理论分布曲线:**
-    *   **二项分布:** 对于有 `n` 层钉板的高尔顿板，小球最终落入第 `k` 个槽（假设中间为 0，向左为负，向右为正）的概率遵循二项分布 B(n, 0.5) 中成功 `n/2 + k` 次（或类似计算，取决于槽的编号方式）的概率。计算出每个槽的理论概率 `P(k)`。
-    *   **正态分布:** 当 `n` 很大时，二项分布可以用正态分布 N(μ, σ²) 来近似。其中均值 μ = n * p = n * 0.5，方差 σ² = n * p * (1-p) = n * 0.25。计算正态分布概率密度函数 (PDF) 在每个槽中心点的值。
-    *   **绘制:** 将计算出的理论概率（或 PDF 值）乘以总小球数，得到理论上的期望小球数。使用 Chart.js 在同一个图表上添加一个 `type: 'line'` 的数据集来绘制这条理论曲线，与实际的柱状图进行对比。
-
-10. **添加 UI 控件和说明:**
-    *   添加按钮（开始/暂停、重置模拟、单步下落）。
-    *   添加滑块或输入框（控制总小球数、下落速率、钉板层数 - 如果做成可变的）。
-    *   在页面上添加文字说明，解释高尔顿板是什么，以及它如何演示以下概念：
-        *   **概率:** 每个钉子处小球向左或向右是随机事件（理想情况下各 50%）。
-        *   **二项分布:** 小球最终落入哪个槽取决于它在一系列二选一（左/右）决策中的总结果，这正是二项分布描述的场景。
-        *   **正态分布:** 当钉板层数（试验次数）足够多时，底部小球形成的分布形状（柱状图）会趋近于钟形的**正态分布曲线**。这是中心极限定理的一个直观展示。
-        *   **大数法则:** 随着下落的小球数量**越来越多**，实际观察到的分布（柱状图）会越来越接近理论上的二项/正态分布曲线。单次或少量试验结果随机性很大，大量重复试验则会显现出规律性。
-        *   **统计:** 收集每个槽的小球数量就是在进行数据收集，绘制柱状图就是在进行数据可视化和频数分布统计。
-
-**关键点和挑战:**
-
-*   **物理参数调整:** 小球的弹性 (`restitution`)、摩擦力 (`friction`) 以及物理引擎的时间步长 (`timeStep`) 对模拟结果的真实性和稳定性至关重要，需要反复调试。目标是让小球在每个钉子处有接近 50/50 的左右分流概率。
-*   **性能优化:** 当小球数量非常多时，物理计算和渲染会成为瓶颈。需要：
-    *   及时移除或冻结（设为静态/睡眠状态）落入底部槽中不再运动的小球。
-    *   使用性能更高的物理引擎（如 Rapier）。
-    *   考虑 Instanced Mesh (Three.js) 来高效渲染大量相同的小球。
-*   **准确性 vs. 视觉效果:** 完美的 50/50 分流在物理模拟中很难精确实现，但可以通过调整钉子形状、碰撞参数等来尽量接近。重点在于展示分布趋势而非精确的概率计算。
-*   **用户体验:** 清晰的界面、流畅的动画、直观的控制和明确的解释是提升学习效果的关键。
-
-**总结:**
-
-创建一个 3D Web 高尔顿板模拟器是一个涉及 3D 图形、物理模拟、数据可视化和 UI 交互的综合性项目。虽然有一定技术挑战，但完成后将是一个非常有价值的教育工具，能够生动地展示概率统计中的核心概念。从基础版本开始，逐步添加功能和优化，你会得到一个很棒的成果！祝你开发顺利！
+5、考虑美观和实用
 
 
-请给出具体的实现代码
-
-
-Okay, creating a full-fledged 3D Galton Board simulator with physics, charting, and UI involves quite a bit of code. Below is a comprehensive example using **Three.js** for the 3D rendering, **Cannon-es** for the physics simulation, and **Chart.js** for visualizing the distribution.
-
-**This example provides:**
-
-1.  A basic 3D scene setup.
-2.  A procedurally generated Galton Board (pegs, walls, bins).
-3.  Physics simulation for falling balls.
-4.  Bin counting when balls settle.
-5.  A bar chart (using Chart.js) showing the distribution in real-time.
-6.  Basic UI controls (Add Balls, Reset).
-7.  Calculation and overlay of the theoretical Binomial distribution curve.
-
-**Prerequisites:**
-
-*   A modern web browser supporting WebGL and ES6 Modules.
-*   You can run this by saving the HTML, CSS, and JS files and opening the HTML file in your browser (you might need a simple local server due to ES6 module imports).
-
----
-
-**1. `index.html` (The Main Page)**
+好的，这是一个使用 HTML、CSS 和 JavaScript (包括 Chart.js 库) 创建的高尔顿板模拟器。所有代码都在一个 `index.html` 文件中，并且考虑了美观、实用性和移动端适配。
 
 ```html
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Galton Board Simulator</title>
-    <link rel="stylesheet" href="style.css">
+    <title>高尔顿板模拟器</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f4f4f4;
+            --peg-color: #34495e;
+            --ball-color: #e74c3c;
+            --bin-color: #7f8c8d;
+            --text-color: #333;
+            --border-radius: 5px;
+            --panel-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .simulator-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 800px; /* Limit max width for larger screens */
+            background-color: var(--panel-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden; /* Important for rounded corners */
+            margin-bottom: 20px;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            /* Maintain aspect ratio, adjust as needed */
+            aspect-ratio: 1 / 0.8;
+            background-color: #e0e0e0;
+            overflow: hidden; /* Keep balls inside */
+        }
+
+        #galtonCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls-panel, .results-panel {
+            padding: 15px;
+            background-color: var(--panel-bg);
+            border-top: 1px solid #ddd;
+        }
+
+        .controls-panel h2, .results-panel h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-align: center;
+            color: var(--primary-color);
+            font-size: 1.2em;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column; /* Stack label and input */
+            align-items: flex-start; /* Align items to the start */
+        }
+
+        .control-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%; /* Full width within its group */
+            cursor: pointer;
+        }
+         .control-group span {
+            font-size: 0.9em;
+            margin-left: 5px; /* Space between slider and value */
+            color: var(--secondary-color);
+            font-weight: bold;
+         }
+
+
+        .button-group {
+            display: flex;
+            justify-content: space-around; /* Space out buttons */
+            gap: 10px; /* Add gap between buttons */
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+            flex-grow: 1; /* Allow buttons to grow */
+        }
+
+        button:hover:not(:disabled) {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            min-height: 250px; /* Ensure chart has some height */
+            margin-top: 10px;
+        }
+
+        #resultsChart {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-text {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        /* Styles are generally mobile-first friendly */
+
+        /* Media query for larger screens (e.g., tablets and desktops) */
+        @media (min-width: 768px) {
+            .simulator-container {
+               /* Optionally allow side-by-side layout on wider screens */
+               /* display: flex; flex-direction: row; */
+               /* Keeping vertical stack often works well even on desktop */
+            }
+
+            .controls-panel, .results-panel {
+                /* Adjust padding or layout if needed */
+            }
+
+             .control-group {
+                flex-direction: row; /* Label and input side-by-side */
+                align-items: center; /* Vertically align label and input */
+             }
+             .control-group label {
+                 margin-bottom: 0;
+                 margin-right: 10px; /* Space between label and slider */
+                 min-width: 80px; /* Ensure labels align somewhat */
+                 text-align: right;
+             }
+             .control-group input[type="range"] {
+                 flex-grow: 1; /* Allow slider to take remaining space */
+             }
+        }
+    </style>
 </head>
 <body>
-    <div id="info">
-        <h2>3D Galton Board Simulator</h2>
-        <p>观察小球下落如何形成近似正态分布。</p>
-        <div id="controls">
-            <label for="numBallsToAdd">添加小球数量:</label>
-            <input type="number" id="numBallsToAdd" value="100" min="1" max="500">
-            <button id="addBallsButton">添加小球</button>
-            <button id="resetButton">重置</button>
+
+    <h1>高尔顿板模拟器 (Galton Board)</h1>
+
+    <div class="simulator-container">
+        <div class="canvas-wrapper">
+            <canvas id="galtonCanvas"></canvas>
         </div>
-        <p>已落下小球总数: <span id="totalBallsDisplay">0</span></p>
-        <p>钉子层数: <span id="pegRowsDisplay">10</span></p> <!-- Example: Display peg rows -->
+
+        <div class="controls-panel">
+            <h2>控制面板</h2>
+            <div class="control-group">
+                <label for="levelsSlider">板层数:</label>
+                <input type="range" id="levelsSlider" min="3" max="16" value="8">
+                <span id="levelsValue">8</span>
+            </div>
+            <div class="control-group">
+                <label for="ballsSlider">小球数量:</label>
+                <input type="range" id="ballsSlider" min="10" max="2000" value="500" step="10">
+                <span id="ballsValue">500</span>
+            </div>
+            <div class="control-group">
+                <label for="speedSlider">模拟速度:</label>
+                <input type="range" id="speedSlider" min="1" max="100" value="80">
+                 <span id="speedValue">80</span>
+            </div>
+            <div class="button-group">
+                <button id="startButton">开始模拟</button>
+                <button id="resetButton">重置</button>
+            </div>
+        </div>
+
+        <div class="results-panel">
+            <h2>统计结果 (正态分布)</h2>
+            <div class="chart-container">
+                <canvas id="resultsChart"></canvas>
+            </div>
+             <p class="info-text" id="simulationInfo">等待开始...</p>
+        </div>
     </div>
 
-    <div id="simulationContainer">
-        <div id="sceneContainer"></div>
-        <div id="chartContainer">
-            <canvas id="distributionChart"></canvas>
-        </div>
-    </div>
+    <script>
+        // --- DOM Elements ---
+        const canvas = document.getElementById('galtonCanvas');
+        const ctx = canvas.getContext('2d');
+        const levelsSlider = document.getElementById('levelsSlider');
+        const levelsValue = document.getElementById('levelsValue');
+        const ballsSlider = document.getElementById('ballsSlider');
+        const ballsValue = document.getElementById('ballsValue');
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValue = document.getElementById('speedValue');
+        const startButton = document.getElementById('startButton');
+        const resetButton = document.getElementById('resetButton');
+        const simulationInfo = document.getElementById('simulationInfo');
+        const resultsChartCanvas = document.getElementById('resultsChart');
 
-    <!-- Libraries (using CDNs for simplicity) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cannon-es@0.19.0/dist/cannon-es.js"></script>
-    <!-- OrbitControls is often separate -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+        // --- Simulation Parameters ---
+        let levels = parseInt(levelsSlider.value);
+        let numBalls = parseInt(ballsSlider.value);
+        let simulationSpeed = parseInt(speedSlider.value); // Higher value = faster simulation (less delay)
 
-    <!-- Your simulation code -->
-    <script type="module" src="main.js"></script>
+        // --- Simulation State ---
+        let pegs = [];
+        let bins = [];
+        let balls = [];
+        let binCounts = [];
+        let animationFrameId = null;
+        let simulationRunning = false;
+        let ballsDropped = 0;
+        let ballsToDrop = 0;
+        let dropInterval = 5; // Milliseconds between ball drops calculation base
+
+        // --- Chart ---
+        let resultsChart = null;
+
+        // --- Constants ---
+        const PEG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--peg-color').trim();
+        const BALL_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--ball-color').trim();
+        const BIN_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--bin-color').trim();
+        const BALL_RADIUS = 4;
+        const PEG_RADIUS = 3;
+
+        // --- Utility Functions ---
+        function getRandomBinary() {
+            return Math.random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
+        }
+
+        function calculateDropInterval() {
+             // Inverse relationship: higher speed value means lower interval
+             // Adjust the formula for desired speed range
+             const maxInterval = 100; // Slowest interval
+             const minInterval = 1;   // Fastest interval
+             dropInterval = maxInterval - (simulationSpeed / 100) * (maxInterval - minInterval) + minInterval;
+        }
+
+
+        // --- Drawing Functions ---
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+            // Also resize chart canvas if needed (Chart.js usually handles responsiveness well)
+             if (resultsChart) {
+                 resultsChart.resize();
+             }
+            drawBoard(); // Redraw board after resize
+            drawBalls(); // Redraw existing balls
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            pegs = [];
+            bins = [];
+            const topMargin = canvas.height * 0.15; // Space at the top
+            const bottomMargin = canvas.height * 0.15; // Space for bins
+            const pegAreaHeight = canvas.height - topMargin - bottomMargin;
+            const horizontalPadding = canvas.width * 0.1; // Padding on the sides
+
+            const availableWidth = canvas.width - 2 * horizontalPadding;
+            const horizontalSpacing = availableWidth / (levels); // Space between pegs horizontally
+            const verticalSpacing = pegAreaHeight / (levels > 1 ? levels -1 : 1); // Space between levels vertically
+
+            // Draw Pegs
+            ctx.fillStyle = PEG_COLOR;
+            for (let i = 0; i < levels; i++) {
+                const numPegsInLevel = i + 1;
+                const levelY = topMargin + i * verticalSpacing;
+                const levelWidth = i * horizontalSpacing;
+                const startX = (canvas.width - levelWidth) / 2;
+
+                pegs[i] = [];
+                for (let j = 0; j < numPegsInLevel; j++) {
+                    const pegX = startX + j * horizontalSpacing;
+                    const pegY = levelY;
+                    pegs[i].push({ x: pegX, y: pegY });
+                    ctx.beginPath();
+                    ctx.arc(pegX, pegY, PEG_RADIUS, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+             // Draw Bins (Collectors)
+             const numBins = levels + 1;
+             const binWidth = availableWidth / numBins;
+             const binHeight = bottomMargin * 0.8; // Height of the bin walls
+             const binStartY = canvas.height - binHeight;
+
+            ctx.fillStyle = BIN_COLOR;
+            ctx.strokeStyle = BIN_COLOR; // Use same color for stroke initially
+            ctx.lineWidth = 2;
+
+            bins = new Array(numBins);
+            const firstBinStartX = horizontalPadding; // Start bins aligned with outer peg potential paths
+
+            for (let i = 0; i < numBins; i++) {
+                 const binX = firstBinStartX + i * binWidth;
+                 bins[i] = { x: binX, y: binStartY, width: binWidth, height: binHeight };
+
+                 // Draw bin dividers
+                 if (i > 0) {
+                      ctx.beginPath();
+                      ctx.moveTo(binX, binStartY);
+                      ctx.lineTo(binX, canvas.height);
+                      ctx.stroke();
+                 }
+             }
+             // Draw bottom line
+             ctx.beginPath();
+             ctx.moveTo(firstBinStartX, canvas.height);
+             ctx.lineTo(firstBinStartX + numBins * binWidth, canvas.height);
+             ctx.stroke();
+        }
+
+        function createBall() {
+             // Start slightly offset horizontally for visual variety if desired
+            const startX = canvas.width / 2 + (Math.random() - 0.5) * 5;
+            return {
+                x: startX,
+                y: BALL_RADIUS * 2,
+                vx: 0, // Horizontal velocity (simplified)
+                vy: 2 + Math.random() * 1, // Vertical velocity
+                level: 0, // Current peg level it's approaching
+                targetPegIndex: 0, // Index of the peg it's aiming for in the next level
+                pathChoices: [], // Stores -1 (left) or 1 (right) for each level
+                finalBin: -1, // Calculated final bin index (-1 until calculated)
+                active: true // Still moving?
+            };
+        }
+
+         function drawBalls() {
+            ctx.fillStyle = BALL_COLOR;
+            balls.forEach(ball => {
+                if (ball.active) {
+                    ctx.beginPath();
+                    ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        // --- Simulation Logic ---
+        function updateSimulation() {
+             if (!simulationRunning) return;
+
+             ctx.clearRect(0, 0, canvas.width, canvas.height);
+             drawBoard(); // Redraw board elements
+
+             let activeBalls = 0;
+
+             // Drop new balls based on speed
+             let ballsToAddThisFrame = 0;
+             if (ballsDropped < ballsToDrop) {
+                  // Calculate how many balls should have been dropped by now
+                  const elapsed = performance.now() - startTime;
+                  const expectedDropped = Math.floor(elapsed / dropInterval);
+                  ballsToAddThisFrame = Math.min(expectedDropped - ballsDropped, ballsToDrop - ballsDropped, 5); // Add up to 5 balls per frame to prevent stutter
+
+                  for (let i = 0; i < ballsToAddThisFrame; i++) {
+                      balls.push(createBall());
+                  }
+                  ballsDropped += ballsToAddThisFrame;
+             }
+
+
+             // Update existing balls
+             balls.forEach((ball, index) => {
+                 if (!ball.active) return;
+
+                 activeBalls++;
+
+                 // Simplified Movement & Collision Logic
+                 if (ball.level < levels) {
+                    const targetPegY = pegs[ball.level][ball.targetPegIndex].y;
+
+                    // Move towards the target peg level
+                    ball.y += ball.vy;
+
+                    // Check if reached or passed the peg level
+                    if (ball.y >= targetPegY) {
+                        ball.y = targetPegY; // Snap to peg level for decision
+
+                        // Make random choice (left -1 or right 1)
+                        const choice = getRandomBinary();
+                        ball.pathChoices.push(choice);
+
+                        // Calculate next target peg index
+                        // If going left (-1), index stays same relative to next row start
+                        // If going right (+1), index increases by 1 relative to next row start
+                        // The actual horizontal movement happens next
+                        ball.targetPegIndex += (choice === 1 ? 1 : 0);
+
+                        // Add slight horizontal velocity based on choice
+                        ball.vx = choice * (Math.random() * 0.5 + 0.5) * 1.5; // Small horizontal push
+
+                        ball.level++; // Move to next level
+                    }
+                 } else {
+                    // Ball has passed all peg levels, move towards bins
+                    ball.y += ball.vy * 1.5; // Fall faster into bins
+                 }
+
+                 // Apply horizontal movement drift
+                 ball.x += ball.vx;
+                 // Dampen horizontal velocity slightly over time (optional)
+                 // ball.vx *= 0.98;
+
+                 // Boundary check (simple wall collision) - prevent balls escaping sides
+                 if (ball.x < BALL_RADIUS) {
+                     ball.x = BALL_RADIUS;
+                     ball.vx *= -0.5; // Bounce slightly
+                 } else if (ball.x > canvas.width - BALL_RADIUS) {
+                     ball.x = canvas.width - BALL_RADIUS;
+                     ball.vx *= -0.5; // Bounce slightly
+                 }
+
+
+                // Check if ball reached the bin area
+                if (ball.y >= canvas.height - BALL_RADIUS * 2 - (bins[0]?.height || 0) ) { // Check against top of bin area or canvas bottom
+                    ball.active = false;
+
+                    // Calculate final bin based on path (sum of choices + levels / 2)
+                    // Or more reliably, based on final X position
+                    let landingBin = -1;
+                    for(let i = 0; i < bins.length; i++) {
+                        if (ball.x >= bins[i].x && ball.x < bins[i].x + bins[i].width) {
+                            landingBin = i;
+                            break;
+                        }
+                    }
+                     // Fallback if slightly outside due to calculation/speed
+                     if (landingBin === -1) {
+                         if (ball.x < bins[0].x) landingBin = 0;
+                         else landingBin = bins.length - 1;
+                     }
+
+
+                    if (landingBin >= 0 && landingBin < binCounts.length) {
+                        binCounts[landingBin]++;
+                    } else {
+                        console.warn("Ball landed outside defined bins", landingBin, ball.x);
+                        // Assign to nearest valid bin if out of bounds?
+                        landingBin = Math.max(0, Math.min(bins.length - 1, landingBin));
+                         binCounts[landingBin]++;
+                    }
+                    // Optional: Remove ball from array to improve performance on very large numbers
+                    // Though keeping them might be useful for final display state
+                    // balls.splice(index, 1); // Be careful when splicing during iteration
+                 }
+             });
+
+             drawBalls(); // Draw all active balls in their new positions
+
+             // Update Chart periodically
+             if (activeBalls > 0 || ballsDropped < ballsToDrop) {
+                 // Update chart more frequently when balls are actively falling
+                 // Or less frequently to save performance
+                 if (ballsDropped % Math.max(1, Math.floor(ballsToDrop / 20)) === 0 || activeBalls < 10) { // Update ~20 times or when near end
+                     updateChart();
+                 }
+                 animationFrameId = requestAnimationFrame(updateSimulation);
+             } else {
+                 // Simulation finished
+                 simulationRunning = false;
+                 updateChart(); // Final chart update
+                 enableControls();
+                 simulationInfo.textContent = `模拟完成！共 ${ballsToDrop} 个小球落下。`;
+                 // console.log("Final Bin Counts:", binCounts);
+             }
+             // Update info text during simulation
+            if (simulationRunning) {
+                simulationInfo.textContent = `模拟中... 已落下 ${ballsDropped} / ${ballsToDrop} 个小球`;
+            }
+        }
+
+        // --- Chart Logic ---
+        function initializeChart() {
+            if (resultsChart) {
+                resultsChart.destroy(); // Destroy previous chart instance
+            }
+            const binLabels = Array.from({ length: levels + 1 }, (_, i) => `槽 ${i}`);
+            binCounts = new Array(levels + 1).fill(0);
+
+            resultsChart = new Chart(resultsChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: binLabels,
+                    datasets: [{
+                        label: '落入各槽小球数量',
+                        data: binCounts,
+                        backgroundColor: Array(levels + 1).fill(0).map(() => `rgba(${Math.floor(Math.random() * 150 + 50)}, ${Math.floor(Math.random() * 150 + 100)}, ${Math.floor(Math.random() * 150 + 150)}, 0.6)`), // Use dynamic colors or a fixed palette
+                        borderColor: Array(levels + 1).fill(0).map(() => `rgba(${Math.floor(Math.random() * 150 + 50)}, ${Math.floor(Math.random() * 150 + 100)}, ${Math.floor(Math.random() * 150 + 150)}, 1)`),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, // Allow chart to fill container height
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '小球数量'
+                            }
+                        },
+                        x: {
+                             title: {
+                                display: true,
+                                text: '收集槽编号'
+                            }
+                        }
+                    },
+                    plugins: {
+                         legend: {
+                             display: false // Hide legend if only one dataset
+                         },
+                        title: {
+                             display: true,
+                             text: '高尔顿板结果分布'
+                        }
+                    },
+                    animation: {
+                        duration: 300, // Short animation for updates
+                        easing: 'linear'
+                    }
+                }
+            });
+        }
+
+        function updateChart() {
+            if (!resultsChart) return;
+            resultsChart.data.datasets[0].data = binCounts;
+             resultsChart.update();
+        }
+
+        // --- Control Logic ---
+        function disableControls() {
+            startButton.disabled = true;
+            resetButton.disabled = false; // Enable reset while running
+            levelsSlider.disabled = true;
+            ballsSlider.disabled = true;
+            speedSlider.disabled = true; // Disable speed change mid-simulation for simplicity
+        }
+
+        function enableControls() {
+            startButton.disabled = false;
+            resetButton.disabled = false; // Keep reset enabled
+            levelsSlider.disabled = false;
+            ballsSlider.disabled = false;
+            speedSlider.disabled = false;
+        }
+
+        function startSimulation() {
+            if (simulationRunning) return;
+
+            simulationRunning = true;
+            disableControls();
+
+            levels = parseInt(levelsSlider.value);
+            ballsToDrop = parseInt(ballsSlider.value);
+            simulationSpeed = parseInt(speedSlider.value);
+            calculateDropInterval();
+
+            balls = [];
+            ballsDropped = 0;
+            binCounts = new Array(levels + 1).fill(0);
+
+            // Ensure canvas dimensions are set before drawing
+            resizeCanvas(); // Recalculate layout based on current levels
+            initializeChart(); // Reinitialize chart with new levels/bins
+            drawBoard(); // Redraw board with new levels
+
+            simulationInfo.textContent = `准备开始模拟 ${ballsToDrop} 个小球...`;
+            startTime = performance.now(); // For timing ball drops
+
+            // Start the animation loop
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            animationFrameId = requestAnimationFrame(updateSimulation);
+        }
+
+        function resetSimulation() {
+             simulationRunning = false;
+             if (animationFrameId) {
+                 cancelAnimationFrame(animationFrameId);
+                 animationFrameId = null;
+             }
+
+             levels = parseInt(levelsSlider.value); // Update levels from slider
+             ballsToDrop = parseInt(ballsSlider.value); // Update ball count
+             simulationSpeed = parseInt(speedSlider.value); // Update speed
+
+             balls = [];
+             ballsDropped = 0;
+             binCounts = new Array(levels + 1).fill(0);
+
+             // Ensure canvas dimensions are set before drawing
+             resizeCanvas(); // Recalculate layout based on current levels
+             initializeChart(); // Reset chart
+             drawBoard(); // Draw clean board
+             updateChart(); // Show empty chart
+
+             enableControls();
+             simulationInfo.textContent = "模拟已重置。请点击“开始模拟”。";
+         }
+
+        // --- Event Listeners ---
+        levelsSlider.addEventListener('input', (e) => {
+            levelsValue.textContent = e.target.value;
+            if (!simulationRunning) {
+                 levels = parseInt(e.target.value);
+                 // Need to redraw board and reinitialize chart if levels change
+                 resizeCanvas(); // Recalculates positions based on new 'levels'
+                 initializeChart();
+            }
+        });
+
+        ballsSlider.addEventListener('input', (e) => {
+            ballsValue.textContent = e.target.value;
+             if (!simulationRunning) {
+                ballsToDrop = parseInt(e.target.value);
+             }
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            speedValue.textContent = e.target.value;
+            simulationSpeed = parseInt(e.target.value);
+            calculateDropInterval(); // Update drop interval immediately
+        });
+
+        startButton.addEventListener('click', startSimulation);
+        resetButton.addEventListener('click', resetSimulation);
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Initial Setup ---
+        levelsValue.textContent = levelsSlider.value;
+        ballsValue.textContent = ballsSlider.value;
+        speedValue.textContent = speedSlider.value;
+        calculateDropInterval();
+        resizeCanvas(); // Initial draw based on default values
+        initializeChart(); // Initialize chart on load
+        enableControls(); // Start with controls enabled
+        resetButton.disabled = true; // Reset is initially disabled until started
+
+    </script>
+
 </body>
 </html>
 ```
 
----
-
-**2. `style.css` (Basic Styling)**
-
-```css
-body {
-    margin: 0;
-    font-family: sans-serif;
-    background-color: #f0f0f0;
-    color: #333;
-    display: flex;
-    flex-direction: column; /* Stack info and simulation vertically */
-    height: 100vh;
-    overflow: hidden; /* Prevent body scrollbars */
-}
-
-#info {
-    padding: 15px;
-    background-color: #ddd;
-    border-bottom: 1px solid #ccc;
-    text-align: center; /* Center info text */
-}
-
-#controls {
-    margin-top: 10px;
-    margin-bottom: 10px;
-}
-
-#controls label {
-    margin-right: 5px;
-}
-
-#controls input[type="number"] {
-    width: 60px;
-    margin-right: 10px;
-}
-
-#controls button {
-    padding: 5px 10px;
-    margin-left: 5px;
-    cursor: pointer;
-}
-
-#simulationContainer {
-    display: flex; /* Arrange scene and chart side-by-side */
-    flex-grow: 1; /* Allow this container to fill remaining space */
-    overflow: hidden; /* Prevent internal scrollbars if content overflows */
-}
-
-#sceneContainer {
-    flex: 3; /* Give scene more space */
-    position: relative; /* Needed for potential overlays */
-    min-width: 0; /* Prevent flex item from overflowing */
-     border-right: 1px solid #ccc; /* Separator */
-}
-
-#chartContainer {
-    flex: 2; /* Give chart less space */
-    padding: 15px;
-    background-color: #fff;
-    display: flex; /* Center canvas */
-    align-items: center;
-    justify-content: center;
-    min-width: 0; /* Prevent flex item from overflowing */
-    overflow: hidden; /* Hide overflow */
-}
-
-canvas#distributionChart {
-    max-width: 100%;
-    max-height: 100%;
-}
-
-/* Style the Three.js canvas if needed (usually fills container) */
-#sceneContainer canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-```
-
----
-
-**3. `main.js` (The Core Logic)**
-
-```javascript
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
-import * as CANNON from 'https://cdn.jsdelivr.net/npm/cannon-es@0.19.0/dist/cannon-es.js';
-// Note: OrbitControls isn't an ES6 module in this CDN version, access via THREE.OrbitControls
-// import { OrbitControls } from '...'; // If using a module version
-
-// --- Configuration ---
-const config = {
-    debugPhysics: false, // Set to true to see physics wireframes
-    pegRows: 10,
-    pegRadius: 0.1,
-    pegHeight: 0.3,
-    pegSpacingH: 0.8, // Horizontal spacing
-    pegSpacingV: 0.7, // Vertical spacing
-    ballRadius: 0.15,
-    ballMass: 0.1,
-    dropHeightOffset: 1.0, // How far above the top peg to drop balls
-    binWidth: 0.8, // Should match pegSpacingH
-    binHeight: 2.0,
-    binWallThickness: 0.1,
-    boardWidthMargin: 0.5, // Extra space on sides
-    physicsTimeStep: 1 / 60, // seconds
-    ballSettleVelocityThreshold: 0.1, // Velocity below which a ball is considered settled
-    ballSettleYThreshold: -4.5, // Y-position below which balls are checked for settling (adjust based on board size)
-    addBallInterval: 50, // Milliseconds between adding balls when clicking button
-};
-
-// --- Global Variables ---
-let scene, camera, renderer, controls;
-let world, physicsDebugger;
-let balls = []; // Store { mesh, body } objects
-let staticMeshes = []; // Store meshes for board elements
-let binCounts = [];
-let totalBallsDropped = 0;
-let chart;
-let boardElements = []; // Store physics bodies of the board for reset
-
-// --- DOM Elements ---
-const sceneContainer = document.getElementById('sceneContainer');
-const addBallsButton = document.getElementById('addBallsButton');
-const resetButton = document.getElementById('resetButton');
-const numBallsToAddInput = document.getElementById('numBallsToAdd');
-const totalBallsDisplay = document.getElementById('totalBallsDisplay');
-const pegRowsDisplay = document.getElementById('pegRowsDisplay');
-const chartCanvas = document.getElementById('distributionChart');
-
-// --- Initialization ---
-function init() {
-    initThree();
-    initCannon();
-    initChart();
-    createBoard();
-    setupEventListeners();
-    pegRowsDisplay.textContent = config.pegRows; // Display initial peg rows
-    animate();
-}
-
-// --- Three.js Setup ---
-function initThree() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeeeeee);
-
-    const aspect = sceneContainer.clientWidth / sceneContainer.clientHeight;
-    camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 100);
-     // Adjust camera position based on board size
-    camera.position.set(0, config.pegRows * config.pegSpacingV * 0.3, config.pegRows * 1.5);
-    camera.lookAt(0, 0, 0);
-
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(sceneContainer.clientWidth, sceneContainer.clientHeight);
-    renderer.shadowMap.enabled = true; // Enable shadows for better depth perception
-    sceneContainer.appendChild(renderer.domElement);
-
-    // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 7.5);
-    directionalLight.castShadow = true; // Allow light to cast shadows
-    // Configure shadow properties (optional, adjust for quality/performance)
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 50;
-    scene.add(directionalLight);
-
-
-    // Controls
-    // Ensure THREE.OrbitControls is loaded (see HTML)
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; // Smooth camera movement
-    controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 2;
-    controls.maxDistance = 50;
-     controls.target.set(0, -config.pegRows * config.pegSpacingV * 0.2, 0); // Aim controls towards board center
-     controls.update();
-
-    // Handle window resize
-    window.addEventListener('resize', onWindowResize, false);
-}
-
-// --- Cannon-es (Physics) Setup ---
-function initCannon() {
-    world = new CANNON.World();
-    world.gravity.set(0, -9.82, 0); // Standard gravity
-    world.broadphase = new CANNON.NaiveBroadphase(); // Simple broadphase
-    // world.solver.iterations = 10; // Adjust solver iterations if needed
-
-    // Define materials
-    const ballMaterial = new CANNON.Material('ballMaterial');
-    const pegMaterial = new CANNON.Material('pegMaterial');
-    const wallMaterial = new CANNON.Material('wallMaterial');
-
-    // Define contact properties (bounciness, friction)
-    const ballPegContact = new CANNON.ContactMaterial(ballMaterial, pegMaterial, {
-        friction: 0.1, // Low friction
-        restitution: 0.5, // Moderate bounciness
-    });
-    world.addContactMaterial(ballPegContact);
-
-    const ballWallContact = new CANNON.ContactMaterial(ballMaterial, wallMaterial, {
-        friction: 0.05,
-        restitution: 0.4,
-    });
-    world.addContactMaterial(ballWallContact);
-
-     // Ground plane (optional but catches stray balls)
-     const groundShape = new CANNON.Plane();
-     const groundBody = new CANNON.Body({ mass: 0, material: wallMaterial }); // Static
-     groundBody.addShape(groundShape);
-     groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate to be horizontal
-     groundBody.position.y = config.ballSettleYThreshold - config.binHeight - 1; // Place below bins
-     world.addBody(groundBody);
-     boardElements.push(groundBody); // Add to list for reset
-
-     if (config.debugPhysics) {
-         // requires cannon-es-debugger
-         // You might need to import it separately if using modules
-         // import CannonDebugger from 'cannon-es-debugger';
-         // physicsDebugger = new CannonDebugger(scene, world.bodies);
-         console.warn("Physics debugger requested but not fully implemented in this example without importing 'cannon-es-debugger'.");
-     }
-}
-
-// --- Chart.js Setup ---
-function initChart() {
-    const numBins = config.pegRows + 1;
-    binCounts = new Array(numBins).fill(0);
-    const binLabels = Array.from({ length: numBins }, (_, i) => i - Math.floor(config.pegRows / 2)); // Labels like -N/2 ... 0 ... N/2
-
-    const ctx = chartCanvas.getContext('2d');
-    chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: binLabels,
-            datasets: [
-                {
-                    label: '实际分布 (球数)',
-                    data: binCounts,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)', // Blue bars
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: '理论二项分布',
-                    data: calculateTheoreticalDistribution(0), // Start with 0 balls
-                    type: 'line', // Overlay as a line chart
-                    fill: false,
-                    borderColor: 'rgba(255, 99, 132, 1)', // Red line
-                    tension: 0.1 // Slight curve
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false, // Allow chart to fill container
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: '小球数量' }
-                },
-                x: {
-                    title: { display: true, text: '落点槽位 (中心为 0)' }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: '高尔顿板小球分布'
-                },
-                tooltip: {
-                   callbacks: {
-                        label: function(context) {
-                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                // Show integer for bars, potentially float for line
-                                if (context.dataset.type === 'line') {
-                                    label += context.parsed.y.toFixed(2);
-                                } else {
-                                     label += context.parsed.y;
-                                }
-                            }
-                            return label;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-// --- Create Board Elements (Visual + Physics) ---
-function createBoard() {
-    const pegGeometry = new THREE.CylinderGeometry(config.pegRadius, config.pegRadius, config.pegHeight, 16);
-    const pegMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
-    const pegShape = new CANNON.Cylinder(config.pegRadius, config.pegRadius, config.pegHeight, 16);
-    const pegPhysicsMaterial = world.materials.find(m => m.name === 'pegMaterial'); // Get reference
-
-    const boardCenterOffset = (config.pegRows * config.pegSpacingH) / 2;
-
-    // Create Pegs
-    for (let i = 0; i < config.pegRows; i++) {
-        const yPos = -(i * config.pegSpacingV);
-        const numPegsInRow = i + 1;
-        const rowWidth = i * config.pegSpacingH;
-        const startX = -rowWidth / 2;
-
-        for (let j = 0; j < numPegsInRow; j++) {
-            const xPos = startX + j * config.pegSpacingH;
-
-            // Visual Peg
-            const pegMesh = new THREE.Mesh(pegGeometry, pegMaterial);
-            pegMesh.position.set(xPos, yPos, 0);
-            pegMesh.castShadow = true;
-            pegMesh.receiveShadow = true;
-            scene.add(pegMesh);
-            staticMeshes.push(pegMesh);
-
-            // Physics Peg
-            const pegBody = new CANNON.Body({
-                mass: 0, // Static
-                shape: pegShape,
-                position: new CANNON.Vec3(xPos, yPos, 0),
-                material: pegPhysicsMaterial
-            });
-            world.addBody(pegBody);
-            boardElements.push(pegBody);
-        }
-    }
-
-     // Create Bins at the bottom
-    const binYPos = -(config.pegRows * config.pegSpacingV) - config.binHeight / 2; // Position below last row
-    const numBins = config.pegRows + 1;
-    const totalBinsWidth = numBins * config.binWidth;
-    const startBinX = -(totalBinsWidth / 2) + config.binWidth / 2;
-
-    const binWallGeometry = new THREE.BoxGeometry(config.binWallThickness, config.binHeight, config.pegHeight); // Make walls thick enough
-    const binWallMaterial = new THREE.MeshStandardMaterial({ color: 0x888888 });
-    const binWallShape = new CANNON.Box(new CANNON.Vec3(config.binWallThickness / 2, config.binHeight / 2, config.pegHeight / 2));
-    const wallPhysicsMaterial = world.materials.find(m => m.name === 'wallMaterial');
-
-    config.ballSettleYThreshold = binYPos - config.binHeight / 2 + config.ballRadius * 2; // Adjust settle threshold
-
-    for (let i = 0; i <= numBins; i++) { // Need numBins + 1 walls
-        const xPos = startBinX - config.binWidth / 2 + i * config.binWidth;
-
-        // Visual Wall
-        const wallMesh = new THREE.Mesh(binWallGeometry, binWallMaterial);
-        wallMesh.position.set(xPos, binYPos, 0);
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        scene.add(wallMesh);
-        staticMeshes.push(wallMesh);
-
-        // Physics Wall
-        const wallBody = new CANNON.Body({
-            mass: 0, // Static
-            shape: binWallShape,
-            position: new CANNON.Vec3(xPos, binYPos, 0),
-            material: wallPhysicsMaterial
-        });
-        world.addBody(wallBody);
-        boardElements.push(wallBody);
-    }
-
-     // Add side walls (optional but recommended)
-     const boardHeight = (config.pegRows * config.pegSpacingV) + config.binHeight;
-     const sideWallHeight = boardHeight + config.dropHeightOffset * 2; // Make tall enough
-     const sideWallPosX = (totalBinsWidth / 2) + config.binWidth / 2 + config.boardWidthMargin;
-     const sideWallGeometry = new THREE.BoxGeometry(config.binWallThickness, sideWallHeight, config.pegHeight);
-     const sideWallShape = new CANNON.Box(new CANNON.Vec3(config.binWallThickness / 2, sideWallHeight / 2, config.pegHeight / 2));
-
-     // Left Wall
-     const leftWallMesh = new THREE.Mesh(sideWallGeometry, binWallMaterial);
-     leftWallMesh.position.set(-sideWallPosX, binYPos + config.binHeight/2 - boardHeight/2 + config.dropHeightOffset, 0);
-     scene.add(leftWallMesh);
-     staticMeshes.push(leftWallMesh);
-     const leftWallBody = new CANNON.Body({ mass: 0, shape: sideWallShape, position: new CANNON.Vec3(leftWallMesh.position.x, leftWallMesh.position.y, 0), material: wallPhysicsMaterial });
-     world.addBody(leftWallBody);
-     boardElements.push(leftWallBody);
-
-     // Right Wall
-     const rightWallMesh = new THREE.Mesh(sideWallGeometry, binWallMaterial);
-     rightWallMesh.position.set(sideWallPosX, binYPos + config.binHeight/2 - boardHeight/2 + config.dropHeightOffset, 0);
-     scene.add(rightWallMesh);
-     staticMeshes.push(rightWallMesh);
-     const rightWallBody = new CANNON.Body({ mass: 0, shape: sideWallShape, position: new CANNON.Vec3(rightWallMesh.position.x, rightWallMesh.position.y, 0), material: wallPhysicsMaterial });
-     world.addBody(rightWallBody);
-     boardElements.push(rightWallBody);
-}
-
-// --- Create a Single Ball ---
-function createBall() {
-    // Visual Ball
-    const ballGeometry = new THREE.SphereGeometry(config.ballRadius, 16, 16);
-    // Random color for visual interest
-    const ballMaterial = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(Math.random() * 0xffffff),
-        metalness: 0.3,
-        roughness: 0.4
-     });
-    const ballMesh = new THREE.Mesh(ballGeometry, ballMaterial);
-    ballMesh.castShadow = true; // Ball casts shadow
-    ballMesh.receiveShadow = true; // Ball receives shadow (less important)
-
-    // Physics Ball
-    const ballShape = new CANNON.Sphere(config.ballRadius);
-    const ballPhysicsMaterial = world.materials.find(m => m.name === 'ballMaterial');
-    const ballBody = new CANNON.Body({
-        mass: config.ballMass,
-        shape: ballShape,
-        material: ballPhysicsMaterial,
-        linearDamping: 0.1, // Slight damping to help settling
-        angularDamping: 0.1,
-    });
-
-    // Start position: above the center top peg with slight random offset
-    const startY = config.dropHeightOffset;
-    const startX = (Math.random() - 0.5) * 0.1; // Tiny horizontal randomness
-    ballBody.position.set(startX, startY, 0);
-    ballMesh.position.copy(ballBody.position); // Sync initial position
-
-    scene.add(ballMesh);
-    world.addBody(ballBody);
-    balls.push({ mesh: ballMesh, body: ballBody, settled: false });
-}
-
-// --- Bin Counting Logic ---
-function checkAndBinBalls() {
-    const numBins = config.pegRows + 1;
-    const totalBinsWidth = numBins * config.binWidth;
-    const firstBinCenterX = -(totalBinsWidth / 2) + config.binWidth / 2;
-
-    for (let i = balls.length - 1; i >= 0; i--) {
-        const ball = balls[i];
-
-        if (ball.settled) continue; // Already binned
-
-        const body = ball.body;
-        const pos = body.position;
-        const vel = body.velocity;
-
-        // Check if ball is near the bottom and has low velocity
-        if (pos.y < config.ballSettleYThreshold && vel.lengthSquared() < config.ballSettleVelocityThreshold * config.ballSettleVelocityThreshold) {
-            // Determine which bin it's in based on X position
-            let binIndex = Math.floor((pos.x - (firstBinCenterX - config.binWidth / 2)) / config.binWidth);
-
-            // Clamp index to valid range [0, numBins - 1]
-            binIndex = Math.max(0, Math.min(binIndex, numBins - 1));
-
-            binCounts[binIndex]++;
-            totalBallsDropped++;
-            updateChartAndInfo();
-
-            // Mark as settled and make static to improve performance
-            ball.settled = true;
-            body.type = CANNON.Body.STATIC; // Make it immovable
-             body.velocity.set(0, 0, 0); // Stop any residual velocity
-             body.angularVelocity.set(0, 0, 0);
-
-            // Optional: Change color or remove from active simulation array if needed later
-            // For now, just making it static is usually enough
-        }
-    }
-}
-
-
-// --- Chart Update ---
-function updateChartAndInfo() {
-    chart.data.datasets[0].data = binCounts; // Update actual counts
-    chart.data.datasets[1].data = calculateTheoreticalDistribution(totalBallsDropped); // Update theoretical curve
-    chart.update();
-    totalBallsDisplay.textContent = totalBallsDropped;
-}
-
-// --- Theoretical Distribution Calculation ---
-function factorial(n) {
-    if (n < 0) return NaN;
-    if (n === 0) return 1;
-    let result = 1;
-    for (let i = 2; i <= n; i++) {
-        result *= i;
-    }
-    return result;
-}
-
-function combinations(n, k) {
-    if (k < 0 || k > n) return 0;
-    if (k === 0 || k === n) return 1;
-    if (k > n / 2) k = n - k; // Optimization
-    // Using formula: n! / (k! * (n-k)!)
-    // Be careful with large numbers, might need logarithms for larger N
-     if (n > 30) { // Use approximation or log gamma for large N
-         console.warn("Factorial calculation might overflow for N > 30. Using potentially less accurate direct calculation.");
-     }
-    return factorial(n) / (factorial(k) * factorial(n - k));
-}
-
-function binomialProbability(n, k, p = 0.5) {
-    // Probability of k successes in n trials with probability p
-    return combinations(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
-}
-
-function calculateTheoreticalDistribution(totalBalls) {
-    const n = config.pegRows; // Number of trials (rows of pegs)
-    const numBins = n + 1;
-    const theoreticalCounts = new Array(numBins).fill(0);
-
-    if (totalBalls === 0) return theoreticalCounts; // Avoid division by zero / NaN
-
-    for (let binIndex = 0; binIndex < numBins; binIndex++) {
-        // Map binIndex (0 to n) to 'k' successes (number of right turns)
-        // If bin 0 is far left, it means 0 right turns. If bin n is far right, it means n right turns.
-        const k = binIndex;
-        const probability = binomialProbability(n, k);
-        theoreticalCounts[binIndex] = probability * totalBalls;
-    }
-    return theoreticalCounts;
-}
-
-
-// --- Event Listeners ---
-function setupEventListeners() {
-    addBallsButton.addEventListener('click', () => {
-        const numToAdd = parseInt(numBallsToAddInput.value, 10);
-        if (isNaN(numToAdd) || numToAdd <= 0) return;
-
-        let count = 0;
-        function addOneBall() {
-            if (count < numToAdd) {
-                createBall();
-                count++;
-                setTimeout(addOneBall, config.addBallInterval); // Add balls gradually
-            }
-        }
-        addOneBall(); // Start the process
-    });
-
-    resetButton.addEventListener('click', () => {
-        // Remove existing balls
-        balls.forEach(ball => {
-            scene.remove(ball.mesh);
-            world.removeBody(ball.body);
-        });
-        balls = []; // Clear the array
-
-        // Reset counts and display
-        binCounts.fill(0);
-        totalBallsDropped = 0;
-        updateChartAndInfo();
-        console.log("Simulation Reset");
-    });
-}
-
-// --- Window Resize Handler ---
-function onWindowResize() {
-    const width = sceneContainer.clientWidth;
-    const height = sceneContainer.clientHeight;
-
-    if (width > 0 && height > 0) { // Ensure dimensions are valid
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height);
-    }
-}
-
-// --- Animation Loop ---
-function animate(time) {
-    requestAnimationFrame(animate);
-
-    // Update controls
-    controls.update();
-
-    // Step the physics world
-    world.step(config.physicsTimeStep);
-
-    // Update ball positions and check for binning
-    balls.forEach(ball => {
-        if (ball.body.type !== CANNON.Body.STATIC) { // Only update dynamic balls
-            ball.mesh.position.copy(ball.body.position);
-            ball.mesh.quaternion.copy(ball.body.quaternion);
-        }
-    });
-
-    checkAndBinBalls(); // Check if any balls have settled
-
-    // Update physics debugger if enabled
-    if (config.debugPhysics && physicsDebugger) {
-       // physicsDebugger.update(); // Call debugger update
-    }
-
-    // Render the scene
-    renderer.render(scene, camera);
-}
-
-// --- Start ---
-init();
-```
-
----
-
-**How to Run:**
-
-1.  **Save:** Save the three code blocks above as `index.html`, `style.css`, and `main.js` in the same folder.
-2.  **Local Server:** Because `main.js` uses ES6 module imports (`import * as THREE...`), you cannot simply open `index.html` directly from your file system in most browsers due to security restrictions (CORS). You need a simple local web server.
-    *   If you have Node.js installed, open a terminal in the folder containing the files and run: `npx http-server`
-    *   If you have Python 3 installed, run: `python -m http.server`
-    *   If you use VS Code, you can install the "Live Server" extension.
-3.  **Open:** Open your web browser and navigate to the address provided by the local server (e.g., `http://localhost:8080` or `http://127.0.0.1:8000`).
-
-**Explanation & Key Concepts Demonstrated:**
-
-1.  **3D Visualization (Three.js):** Creates the visual representation of the board and balls. Uses lighting and shadows for better depth. `OrbitControls` allows interaction.
-2.  **Physics Simulation (Cannon-es):**
-    *   `CANNON.World`: Manages the physics simulation.
-    *   `CANNON.Body`: Represents physical objects (static for pegs/walls, dynamic for balls).
-    *   `CANNON.Material` & `CANNON.ContactMaterial`: Define how objects interact upon collision (bounciness `restitution`, `friction`). Tuning these is crucial for realistic behavior.
-    *   `world.step()`: Advances the physics simulation by a small time step in the `animate` loop.
-3.  **Connecting Physics and Visuals:** In the `animate` loop, the position and rotation of each visual ball mesh (`ball.mesh`) are updated to match its corresponding physics body (`ball.body`) on every frame.
-4.  **Randomness & Probability:** Each time a ball hits a peg, the physics engine determines its bounce direction based on collision angles and material properties. Ideally, this leads to roughly a 50/50 chance of going left or right at each peg.
-5.  **Binomial Distribution:** The final horizontal position of a ball depends on the *sum* of many (approximately) independent left/right choices (one for each row of pegs it encounters). This naturally leads to a binomial distribution for the probability of landing in a specific bin. The `calculateTheoreticalDistribution` function computes this.
-6.  **Normal Distribution Approximation:** As the number of peg rows (`config.pegRows`) increases, the binomial distribution visually approximates the bell shape of the normal (Gaussian) distribution. This is a demonstration of the **Central Limit Theorem**.
-7.  **Law of Large Numbers:** When you drop only a few balls (`totalBallsDropped` is small), the observed distribution (blue bars) might look quite random and uneven. As you add *more and more* balls, the shape of the blue bars will increasingly resemble the theoretical red curve. This demonstrates that with more trials, the experimental average converges towards the theoretical expectation.
-8.  **Statistics:** The process of counting balls in each bin (`binCounts`) and visualizing it with the chart is a basic form of data collection and frequency distribution analysis.
-9.  **Performance:** Making balls `STATIC` once they settle in the bins (`checkAndBinBalls` function) significantly improves performance, as the physics engine no longer needs to calculate their movements.
-
-Feel free to tweak the `config` values (especially `pegRows`, physics properties, and thresholds) to see how they affect the simulation!
+**说明:**
+
+1.  **HTML 结构 (`index.html`)**:
+    * 包含必要的 `meta` 标签（特别是 `viewport` 用于移动端）。
+    * 引入 Chart.js 库的 CDN 链接。
+    * 主体结构分为三个主要部分：模拟区域 (`canvas-wrapper`)、控制面板 (`controls-panel`) 和结果图表区域 (`results-panel`)，都包裹在一个 `simulator-container` 中。
+    * 使用 `canvas` 元素 (`galtonCanvas` 用于模拟，`resultsChart` 用于图表)。
+    * 控制面板包含滑块 (`input[type="range"]`) 用于调整层数、小球数量和速度，以及开始/重置按钮。
+    * 使用 `label` 和 `span` 显示滑块的当前值。
+    * 结果区域包含图表的 `canvas` 和一个信息文本 (`simulationInfo`)。
+
+2.  **CSS 样式 (`<style>` 标签)**:
+    * 使用 CSS 变量 (`:root`) 定义颜色和常用值，方便修改主题。
+    * 基本的页面布局和元素样式（背景、字体、边距、内边距）。
+    * `.simulator-container`: 使用 Flexbox 垂直排列三个主要部分。设置 `max-width` 以便在大屏幕上不会过宽。`overflow: hidden` 配合 `border-radius` 使用。
+    * `.canvas-wrapper`: 使用 `aspect-ratio` 保持模拟区域的比例。`position: relative` 和 `overflow: hidden`。
+    * `.controls-panel`, `.results-panel`: 设置内边距和背景。
+    * **移动端适配**:
+        * 布局默认采用垂直堆叠 (`flex-direction: column`)，天然适合移动端。控制面板和结果面板位于模拟画布下方，不会遮挡。
+        * 使用 `@media (min-width: 768px)` 为平板和桌面端调整控制组 (`.control-group`) 的布局，使标签和滑块水平排列，提升空间利用率。
+        * `canvas` 和图表容器的宽度设置为 `100%`，使其在父容器内自适应。
+    * 按钮和滑块样式，包括禁用状态。
+    * `.chart-container`: 设置 `min-height` 保证图表区域有初始高度。
+
+3.  **JavaScript 逻辑 (`<script>` 标签)**:
+    * **获取 DOM 元素**: 获取所有需要的 HTML 元素的引用。
+    * **状态变量**: 定义模拟参数（层数、球数、速度）、状态（钉子位置 `pegs`、收集槽 `bins`、小球数组 `balls`、各槽计数 `binCounts`、动画 ID `animationFrameId`、运行标志 `simulationRunning` 等）。
+    * **Chart.js**: 定义 `resultsChart` 变量来存储图表实例。
+    * **核心函数**:
+        * `resizeCanvas()`: 处理窗口大小调整，重新计算画布尺寸、元素位置并重绘。
+        * `drawBoard()`: 绘制背景、钉子（小圆点）和底部的收集槽（矩形）。钉子和收集槽的位置根据当前层数和画布尺寸动态计算。
+        * `createBall()`: 创建一个新的小球对象，包含初始位置、速度（简化处理）、路径选择等属性。
+        * `drawBalls()`: 遍历 `balls` 数组并绘制所有活动的小球。
+        * `updateSimulation()`: 这是动画循环的核心。
+            * 清除画布、重绘板子。
+            * 根据速度设定，在每个合适的时机添加新的小球 (`ballsDropped`, `dropInterval`)。
+            * 更新每个活动小球的位置：
+                * **简化物理**: 当小球到达钉子层级时，随机选择向左或向右（`getRandomBinary`），并施加一个小的水平速度分量。主要还是垂直下落。
+                * 当小球越过所有钉子层，就直接落向底部。
+                * 简单的边界碰撞检测，防止小球飞出画布。
+            * 当小球到达底部区域时，判断它落入哪个收集槽 (`bins`)，增加对应槽的计数 (`binCounts`)，并将小球标记为非活动 (`ball.active = false`)。
+            * 绘制所有活动小球。
+            * 定期（不是每一帧，以提高性能）调用 `updateChart()` 更新图表。
+            * 使用 `requestAnimationFrame(updateSimulation)` 实现动画循环。
+            * 当所有小球落下后，停止动画，启用控件，显示最终信息。
+        * `initializeChart()`: 使用 Chart.js 创建或重置条形图，根据当前的层数设置 X 轴标签（槽编号）和初始化数据。
+        * `updateChart()`: 更新 Chart.js 图表的数据集并重新渲染。
+        * `startSimulation()`: 处理开始按钮点击事件。设置状态、禁用控件、重置计数、初始化小球掉落逻辑、启动动画循环。
+        * `resetSimulation()`: 处理重置按钮点击事件。停止动画、清空状态、重置画布和图表、启用控件。
+        * `disableControls()`, `enableControls()`: 切换控件的可用状态。
+        * `calculateDropInterval()`: 根据速度滑块的值计算小球下落的时间间隔。
+    * **事件监听器**: 监听滑块的 `input` 事件以更新显示的值和相关参数（如果模拟未运行），监听按钮的 `click` 事件，监听窗口的 `resize` 事件。
+    * **初始设置**: 页面加载时，设置滑块初始值，计算初始下落间隔，首次绘制画布和图表，并设置控件状态。
+
+**如何使用:**
+
+1.  将以上所有代码复制并粘贴到一个名为 `index.html` 的文件中。
+2.  用现代浏览器（如 Chrome, Firefox, Edge, Safari）打开这个 `index.html` 文件。
+3.  调整滑块来设置模拟参数。
+4.  点击“开始模拟”按钮。
+5.  观察小球下落并在底部形成近似正态分布的堆积，同时下方的条形图会实时（或定期）更新显示每个槽中的小球数量。
+6.  可以在模拟过程中或结束后点击“重置”按钮来清除当前状态并重新开始。
+7.  尝试在不同设备或调整浏览器窗口大小，观察页面布局的自适应效果。
+
+这个模拟器直观地展示了随机事件（小球碰到钉子向左或向右）如何累积产生符合二项分布（当层数较少时）并趋近于正态分布（当小球数量和层数足够多时）的结果，体现了大数定律和中心极限定理的概念。
