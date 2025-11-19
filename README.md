@@ -29,6 +29,11 @@ ai related works collection
 | 色彩消消乐  | [content](https://awesome-ai-hub.anzz.top/web/game/ColorMatch_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/ColorMatch_2025.03.29/index.html) | ★★★★★ | - |
 | 双人贪吃蛇大作战  | [content](https://awesome-ai-hub.anzz.top/web/game/SnakeBattle_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/SnakeBattle_2025.03.29/index.html) | ★★★★★ | - |
 | 星际探险家  | [content](https://awesome-ai-hub.anzz.top/web/game/StarExplorers_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/StarExplorers_2025.03.29/index.html) | ★★★☆☆ | - |
+| 彩色泡泡射击  | [content](https://awesome-ai-hub.anzz.top/web/game/BubbleShooter_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/BubbleShooter_2025.03.29/index.html) | ★★★★★ | - |
+| 飞扬小鸟  | [content](https://awesome-ai-hub.anzz.top/web/game/FlappyBird_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/FlappyBird_2025.03.29/index.html) | ★★★★★ | - |
+| 2048数字消除  | [content](https://awesome-ai-hub.anzz.top/web/game/Game2048_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/Game2048_2025.03.29/index.html) | ★★★★★ | - |
+| 塔防大战  | [content](https://awesome-ai-hub.anzz.top/web/game/TowerDefense_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/TowerDefense_2025.03.29/index.html) | ★★★★★ | - |
+| 吃豆人迷宫  | [content](https://awesome-ai-hub.anzz.top/web/game/PacmanMaze_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/PacmanMaze_2025.03.29/index.html) | ★★★★★ | - |
 
 ## Gemini
 
