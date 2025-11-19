@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>节奏大师</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        h1 {
+            text-shadow: 0 0 30px #ff00ff, 0 0 60px #00ffff;
+            margin: 20px 0;
+            font-size: 3em;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        #gameCanvas {
+            border: 3px solid #ff00ff;
+            border-radius: 15px;
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.6), inset 0 0 20px rgba(0, 255, 255, 0.3);
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.8) 100%);
+        }
+        
+        .game-info {
+            display: flex;
+            gap: 40px;
+            margin: 15px 0;
+            font-size: 1.5em;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 15px 40px;
+            border-radius: 50px;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.4);
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .combo {
+            font-size: 2em;
+            color: #ffff00;
+            text-shadow: 0 0 20px #ffff00;
+            animation: comboPulse 0.5s ease-out;
+        }
+        
+        @keyframes comboPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        
+        button {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #ff00ff, #00ffff);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(255, 0, 255, 0.5);
+            font-weight: bold;
+        }
+        
+        button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 25px rgba(255, 0, 255, 0.7);
+        }
+        
+        button:active {
+            transform: translateY(0) scale(0.95);
+        }
+        
+        .key-hints {
+            display: flex;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        
+        .key-hint {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid #ff00ff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            transition: all 0.1s;
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+        }
+        
+        .key-hint.active {
+            background: rgba(255, 0, 255, 0.8);
+            transform: scale(0.9);
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.9);
+        }
+        
+        #result {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 50px 80px;
+            border-radius: 25px;
+            border: 4px solid #ff00ff;
+            box-shadow: 0 0 60px rgba(255, 0, 255, 0.9);
+            display: none;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        #result.show {
+            display: block;
+            animation: resultIn 0.5s ease-out;
+        }
+        
+        @keyframes resultIn {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-180deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+        }
+        
+        .hit-feedback {
+            position: fixed;
+            font-size: 2em;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 999;
+            animation: hitFade 1s ease-out forwards;
+        }
+        
+        @keyframes hitFade {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+        
+        .instructions {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 30px;
+            border-radius: 15px;
+            margin-top: 10px;
+            text-align: center;
+        }
+        
+        .instructions p {
+            margin: 5px 0;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 节奏大师 🎵</h1>
+    
+    <div class="game-info">
+        <div class="info-item">
+            分数: <span id="score">0</span>
+        </div>
+        <div class="info-item">
+            连击: <span id="combo" class="combo">0</span>
+        </div>
+        <div class="info-item">
+            准确率: <span id="accuracy">100%</span>
+        </div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div class="key-hints">
+        <div class="key-hint" data-key="d">D</div>
+        <div class="key-hint" data-key="f">F</div>
+        <div class="key-hint" data-key="j">J</div>
+        <div class="key-hint" data-key="k">K</div>
+    </div>
+    
+    <div class="controls">
+        <button id="startBtn">开始游戏</button>
+        <button id="pauseBtn">暂停</button>
+    </div>
+    
+    <div class="instructions">
+        <p>🎹 按下 D、F、J、K 键击打音符</p>
+        <p>⭐ Perfect: ±50ms | Good: ±100ms | Miss: 超出范围</p>
+        <p>🔥 连击越高，分数加成越大！</p>
+    </div>
+    
+    <div id="result">
+        <h2 style="color: #ff00ff; font-size: 3em; margin-bottom: 20px;">游戏结束</h2>
+        <p style="font-size: 1.8em; margin: 15px 0;">最终分数: <span id="finalScore">0</span></p>
+        <p style="font-size: 1.5em; margin: 15px 0;">最高连击: <span id="maxCombo">0</span></p>
+        <p style="font-size: 1.5em; margin: 15px 0;">准确率: <span id="finalAccuracy">0%</span></p>
+        <p style="font-size: 1.3em; margin: 15px 0;">
+            Perfect: <span id="perfectCount">0</span> | 
+            Good: <span id="goodCount">0</span> | 
+            Miss: <span id="missCount">0</span>
+        </p>
+        <button id="playAgainBtn" style="margin-top: 30px;">再来一次</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const comboEl = document.getElementById('combo');
+        const accuracyEl = document.getElementById('accuracy');
+        const resultEl = document.getElementById('result');
+        const finalScoreEl = document.getElementById('finalScore');
+        const maxComboEl = document.getElementById('maxCombo');
+        const finalAccuracyEl = document.getElementById('finalAccuracy');
+        const perfectCountEl = document.getElementById('perfectCount');
+        const goodCountEl = document.getElementById('goodCount');
+        const missCountEl = document.getElementById('missCount');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const keyHints = document.querySelectorAll('.key-hint');
+        
+        const lanes = ['d', 'f', 'j', 'k'];
+        const laneX = [150, 300, 500, 650];
+        const hitZoneY = 500;
+        const hitTolerance = {
+            perfect: 50,
+            good: 100
+        };
+        
+        let gameState = {
+            running: false,
+            paused: false,
+            score: 0,
+            combo: 0,
+            maxCombo: 0,
+            notes: [],
+            nextNoteTime: 0,
+            noteSpeed: 3,
+            bpm: 120,
+            beatInterval: 0,
+            stats: {
+                perfect: 0,
+                good: 0,
+                miss: 0,
+                total: 0
+            },
+            pressedKeys: {}
+        };
+        
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (lanes.includes(key) && !gameState.pressedKeys[key]) {
+                gameState.pressedKeys[key] = true;
+                highlightKey(key);
+                checkHit(key);
+            }
+            
+            if (e.key === ' ' && gameState.running) {
+                e.preventDefault();
+                togglePause();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (lanes.includes(key)) {
+                gameState.pressedKeys[key] = false;
+                unhighlightKey(key);
+            }
+        });
+        
+        startBtn.addEventListener('click', startGame);
+        pauseBtn.addEventListener('click', togglePause);
+        playAgainBtn.addEventListener('click', () => {
+            resultEl.classList.remove('show');
+            startGame();
+        });
+        
+        function highlightKey(key) {
+            const keyHint = document.querySelector(`[data-key="${key}"]`);
+            if (keyHint) keyHint.classList.add('active');
+        }
+        
+        function unhighlightKey(key) {
+            const keyHint = document.querySelector(`[data-key="${key}"]`);
+            if (keyHint) keyHint.classList.remove('active');
+        }
+        
+        function startGame() {
+            gameState = {
+                running: true,
+                paused: false,
+                score: 0,
+                combo: 0,
+                maxCombo: 0,
+                notes: [],
+                nextNoteTime: Date.now() + 1000,
+                noteSpeed: 3,
+                bpm: 120,
+                beatInterval: (60 / 120) * 1000,
+                stats: {
+                    perfect: 0,
+                    good: 0,
+                    miss: 0,
+                    total: 0
+                },
+                pressedKeys: {},
+                gameStartTime: Date.now(),
+                gameDuration: 60000
+            };
+            
+            updateUI();
+            gameLoop();
+        }
+        
+        function togglePause() {
+            if (!gameState.running) return;
+            gameState.paused = !gameState.paused;
+            pauseBtn.textContent = gameState.paused ? '继续' : '暂停';
+            if (!gameState.paused) {
+                gameLoop();
+            }
+        }
+        
+        function spawnNote() {
+            const now = Date.now();
+            if (now >= gameState.nextNoteTime) {
+                const lane = Math.floor(Math.random() * 4);
+                gameState.notes.push({
+                    lane: lane,
+                    y: -50,
+                    hit: false,
+                    color: `hsl(${lane * 90}, 70%, 60%)`
+                });
+                
+                gameState.nextNoteTime = now + gameState.beatInterval / (1 + Math.random());
+                
+                if (now - gameState.gameStartTime > 30000) {
+                    gameState.noteSpeed = 4;
+                    gameState.bpm = 140;
+                } else if (now - gameState.gameStartTime > 45000) {
+                    gameState.noteSpeed = 5;
+                    gameState.bpm = 160;
+                }
+            }
+        }
+        
+        function updateNotes() {
+            for (let i = gameState.notes.length - 1; i >= 0; i--) {
+                const note = gameState.notes[i];
+                note.y += gameState.noteSpeed;
+                
+                if (note.y > canvas.height + 50 && !note.hit) {
+                    gameState.notes.splice(i, 1);
+                    noteMissed();
+                }
+            }
+        }
+        
+        function checkHit(key) {
+            if (!gameState.running || gameState.paused) return;
+            
+            const laneIndex = lanes.indexOf(key);
+            const notesInLane = gameState.notes.filter(note => 
+                note.lane === laneIndex && !note.hit
+            );
+            
+            if (notesInLane.length === 0) return;
+            
+            const closestNote = notesInLane.reduce((closest, note) => {
+                const distance = Math.abs(note.y - hitZoneY);
+                const closestDistance = Math.abs(closest.y - hitZoneY);
+                return distance < closestDistance ? note : closest;
+            });
+            
+            const distance = Math.abs(closestNote.y - hitZoneY);
+            
+            if (distance <= hitTolerance.perfect) {
+                hitNote(closestNote, 'perfect', 100);
+            } else if (distance <= hitTolerance.good) {
+                hitNote(closestNote, 'good', 50);
+            }
+        }
+        
+        function hitNote(note, rating, baseScore) {
+            note.hit = true;
+            gameState.notes = gameState.notes.filter(n => n !== note);
+            
+            gameState.combo++;
+            if (gameState.combo > gameState.maxCombo) {
+                gameState.maxCombo = gameState.combo;
+            }
+            
+            const comboMultiplier = 1 + (gameState.combo / 10);
+            const score = Math.floor(baseScore * comboMultiplier);
+            gameState.score += score;
+            
+            if (rating === 'perfect') {
+                gameState.stats.perfect++;
+            } else {
+                gameState.stats.good++;
+            }
+            gameState.stats.total++;
+            
+            showHitFeedback(laneX[note.lane], hitZoneY, rating, score);
+            createHitParticles(laneX[note.lane], hitZoneY, note.color);
+            updateUI();
+        }
+        
+        function noteMissed() {
+            gameState.combo = 0;
+            gameState.stats.miss++;
+            gameState.stats.total++;
+            updateUI();
+        }
+        
+        function showHitFeedback(x, y, rating, score) {
+            const feedback = document.createElement('div');
+            feedback.className = 'hit-feedback';
+            feedback.style.left = x + 'px';
+            feedback.style.top = y + 'px';
+            
+            if (rating === 'perfect') {
+                feedback.textContent = `PERFECT +${score}`;
+                feedback.style.color = '#00ff00';
+                feedback.style.textShadow = '0 0 20px #00ff00';
+            } else {
+                feedback.textContent = `GOOD +${score}`;
+                feedback.style.color = '#ffff00';
+                feedback.style.textShadow = '0 0 20px #ffff00';
+            }
+            
+            document.body.appendChild(feedback);
+            setTimeout(() => feedback.remove(), 1000);
+        }
+        
+        function createHitParticles(x, y, color) {
+            const particleCount = 10;
+            for (let i = 0; i < particleCount; i++) {
+                const angle = (Math.PI * 2 * i) / particleCount;
+                const speed = 5;
+                gameState.particles = gameState.particles || [];
+                gameState.particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: color,
+                    life: 1,
+                    size: 5
+                });
+            }
+        }
+        
+        function updateParticles() {
+            if (!gameState.particles) return;
+            
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+                p.size *= 0.95;
+                
+                if (p.life <= 0) {
+                    gameState.particles.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateUI() {
+            scoreEl.textContent = gameState.score;
+            comboEl.textContent = gameState.combo;
+            
+            if (gameState.stats.total > 0) {
+                const accuracy = ((gameState.stats.perfect * 100 + gameState.stats.good * 50) / 
+                    (gameState.stats.total * 100) * 100).toFixed(1);
+                accuracyEl.textContent = accuracy + '%';
+            }
+            
+            if (gameState.combo > 0) {
+                comboEl.parentElement.style.animation = 'none';
+                setTimeout(() => {
+                    comboEl.parentElement.style.animation = 'comboPulse 0.5s ease-out';
+                }, 10);
+            }
+        }
+        
+        function checkGameEnd() {
+            const now = Date.now();
+            if (now - gameState.gameStartTime >= gameState.gameDuration) {
+                endGame();
+            }
+        }
+        
+        function endGame() {
+            gameState.running = false;
+            
+            finalScoreEl.textContent = gameState.score;
+            maxComboEl.textContent = gameState.maxCombo;
+            perfectCountEl.textContent = gameState.stats.perfect;
+            goodCountEl.textContent = gameState.stats.good;
+            missCountEl.textContent = gameState.stats.miss;
+            
+            if (gameState.stats.total > 0) {
+                const accuracy = ((gameState.stats.perfect * 100 + gameState.stats.good * 50) / 
+                    (gameState.stats.total * 100) * 100).toFixed(1);
+                finalAccuracyEl.textContent = accuracy + '%';
+            }
+            
+            resultEl.classList.add('show');
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                ctx.beginPath();
+                ctx.moveTo(laneX[i], 0);
+                ctx.lineTo(laneX[i], canvas.height);
+                ctx.stroke();
+            }
+            
+            ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+            ctx.fillRect(0, hitZoneY - 30, canvas.width, 60);
+            
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(0, hitZoneY - 30, canvas.width, 60);
+            
+            for (const note of gameState.notes) {
+                ctx.save();
+                ctx.translate(laneX[note.lane], note.y);
+                
+                ctx.fillStyle = note.color;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = note.color;
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, 25, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('♪', 0, 0);
+                
+                ctx.restore();
+            }
+            
+            if (gameState.particles) {
+                for (const p of gameState.particles) {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+            }
+        }
+        
+        function gameLoop() {
+            if (!gameState.running || gameState.paused) return;
+            
+            spawnNote();
+            updateNotes();
+            updateParticles();
+            checkGameEnd();
+            draw();
+            
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
+</body>
+</html>
