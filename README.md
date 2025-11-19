@@ -22,6 +22,13 @@ ai related works collection
 |-------------|--------|-------|---------------------------------------|-------|------|
 | 3D魔方  | [content](https://awesome-ai-hub.anzz.top/web/game/3dMagicCube/claude/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/3dMagicCube/claude/index.html) | ★★☆☆☆ | - |
 | 3D高尔顿板模拟器  | [content](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/claude_3.7_sonnet/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/3DGaltonBoardSimulator/claude_3.7_sonnet/index.html) | ★★★★☆ | - |
+| 星际大战  | [content](https://awesome-ai-hub.anzz.top/web/game/SpaceShooter_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/SpaceShooter_2025.03.29/index.html) | ★★★★★ | - |
+| 记忆翻牌大师  | [content](https://awesome-ai-hub.anzz.top/web/game/MemoryMatch_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/MemoryMatch_2025.03.29/index.html) | ★★★★★ | - |
+| 节奏大师  | [content](https://awesome-ai-hub.anzz.top/web/game/RhythmMaster_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/RhythmMaster_2025.03.29/index.html) | ★★★★★ | - |
+| 跳跃大师  | [content](https://awesome-ai-hub.anzz.top/web/game/JumpMaster_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/JumpMaster_2025.03.29/index.html) | ★★★★★ | - |
+| 色彩消消乐  | [content](https://awesome-ai-hub.anzz.top/web/game/ColorMatch_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/ColorMatch_2025.03.29/index.html) | ★★★★★ | - |
+| 双人贪吃蛇大作战  | [content](https://awesome-ai-hub.anzz.top/web/game/SnakeBattle_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/SnakeBattle_2025.03.29/index.html) | ★★★★★ | - |
+| 星际探险家  | [content](https://awesome-ai-hub.anzz.top/web/game/StarExplorers_2025.03.29/README.md) | Claude-3.7-Sonnet | [链接](https://awesome-ai-hub.anzz.top/web/game/StarExplorers_2025.03.29/index.html) | ★★★☆☆ | - |
 
 ## Gemini
 

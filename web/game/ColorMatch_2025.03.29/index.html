@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>色彩消消乐</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            margin: 20px 0;
+            font-size: 2.8em;
+            animation: rainbow 3s linear infinite;
+        }
+        
+        @keyframes rainbow {
+            0% { color: #ff0000; }
+            16% { color: #ff8800; }
+            33% { color: #ffff00; }
+            50% { color: #00ff00; }
+            66% { color: #0088ff; }
+            83% { color: #8800ff; }
+            100% { color: #ff0000; }
+        }
+        
+        .game-info {
+            display: flex;
+            gap: 30px;
+            margin: 15px 0;
+            font-size: 1.4em;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 40px;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #gameBoard {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            margin: 20px 0;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 5px;
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8em;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+        
+        .cell:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .cell.selected {
+            transform: scale(1.15);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            border: 3px solid white;
+        }
+        
+        .cell.matching {
+            animation: match 0.5s ease-out;
+        }
+        
+        @keyframes match {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3) rotate(180deg); }
+        }
+        
+        .cell.falling {
+            animation: fall 0.5s ease-in;
+        }
+        
+        @keyframes fall {
+            from { transform: translateY(-300px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        button {
+            padding: 12px 30px;
+            font-size: 18px;
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.5);
+            font-weight: bold;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(245, 87, 108, 0.7);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        #gameOver {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 50px 80px;
+            border-radius: 30px;
+            border: 4px solid #f5576c;
+            box-shadow: 0 0 60px rgba(245, 87, 108, 0.9);
+            display: none;
+            text-align: center;
+            z-index: 1000;
+        }
+        
+        #gameOver.show {
+            display: block;
+            animation: popIn 0.5s ease-out;
+        }
+        
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(-180deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+        }
+        
+        .progress-bar {
+            width: 500px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+            border: 2px solid white;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .combo-indicator {
+            font-size: 2em;
+            color: #ffd700;
+            text-shadow: 0 0 20px #ffd700;
+            animation: comboPulse 0.5s ease-out;
+            margin: 10px 0;
+        }
+        
+        @keyframes comboPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <h1>🌈 色彩消消乐 🌈</h1>
+    
+    <div class="game-info">
+        <div>分数: <span id="score">0</span></div>
+        <div>移动: <span id="moves">30</span></div>
+        <div>连击: <span id="combo">0</span>x</div>
+    </div>
+    
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressBar">
+            <span id="progressText">目标: 0/1000</span>
+        </div>
+    </div>
+    
+    <div id="gameBoard">
+        <div class="grid" id="grid"></div>
+    </div>
+    
+    <div class="controls">
+        <button id="startBtn">开始游戏</button>
+        <button id="hintBtn">提示 (3)</button>
+    </div>
+    
+    <div style="background: rgba(0, 0, 0, 0.3); padding: 15px 30px; border-radius: 15px; max-width: 600px; text-align: center; backdrop-filter: blur(10px);">
+        <p>💡 交换相邻方块，连成3个或更多相同颜色消除</p>
+        <p>🔥 一次消除越多，分数越高！</p>
+        <p>⭐ 达到目标分数即可过关</p>
+    </div>
+    
+    <div id="gameOver">
+        <h2 id="resultTitle" style="font-size: 3em; margin-bottom: 20px;">游戏结束</h2>
+        <p style="font-size: 2em; margin: 15px 0;">最终分数: <span id="finalScore">0</span></p>
+        <p style="font-size: 1.5em; margin: 15px 0;">最高连击: <span id="maxCombo">0</span>x</p>
+        <button id="restartBtn" style="margin-top: 30px;">再玩一次</button>
+    </div>
+
+    <script>
+        const grid = document.getElementById('grid');
+        const scoreEl = document.getElementById('score');
+        const movesEl = document.getElementById('moves');
+        const comboEl = document.getElementById('combo');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const gameOverEl = document.getElementById('gameOver');
+        const resultTitle = document.getElementById('resultTitle');
+        const finalScoreEl = document.getElementById('finalScore');
+        const maxComboEl = document.getElementById('maxCombo');
+        const startBtn = document.getElementById('startBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        
+        const GRID_SIZE = 8;
+        const colors = ['🔴', '🟢', '🔵', '🟡', '🟣', '🟠'];
+        
+        let gameState = {
+            running: false,
+            board: [],
+            score: 0,
+            moves: 30,
+            combo: 0,
+            maxCombo: 0,
+            target: 1000,
+            selectedCell: null,
+            hints: 3,
+            animating: false
+        };
+        
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', () => {
+            gameOverEl.classList.remove('show');
+            startGame();
+        });
+        
+        hintBtn.addEventListener('click', showHint);
+        
+        function startGame() {
+            gameState = {
+                running: true,
+                board: [],
+                score: 0,
+                moves: 30,
+                combo: 0,
+                maxCombo: 0,
+                target: 1000,
+                selectedCell: null,
+                hints: 3,
+                animating: false
+            };
+            
+            initBoard();
+            updateUI();
+            renderBoard();
+        }
+        
+        function initBoard() {
+            gameState.board = [];
+            
+            for (let row = 0; row < GRID_SIZE; row++) {
+                gameState.board[row] = [];
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    gameState.board[row][col] = getRandomColor();
+                }
+            }
+            
+            while (findMatches().length > 0) {
+                for (let row = 0; row < GRID_SIZE; row++) {
+                    for (let col = 0; col < GRID_SIZE; col++) {
+                        gameState.board[row][col] = getRandomColor();
+                    }
+                }
+            }
+        }
+        
+        function getRandomColor() {
+            return colors[Math.floor(Math.random() * colors.length)];
+        }
+        
+        function renderBoard() {
+            grid.innerHTML = '';
+            
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+                    cell.textContent = gameState.board[row][col];
+                    cell.style.backgroundColor = getCellBgColor(gameState.board[row][col]);
+                    
+                    cell.addEventListener('click', () => handleCellClick(row, col));
+                    
+                    grid.appendChild(cell);
+                }
+            }
+        }
+        
+        function getCellBgColor(emoji) {
+            const colorMap = {
+                '🔴': '#ef4444',
+                '🟢': '#22c55e',
+                '🔵': '#3b82f6',
+                '🟡': '#eab308',
+                '🟣': '#a855f7',
+                '🟠': '#f97316'
+            };
+            return colorMap[emoji] || '#gray';
+        }
+        
+        function handleCellClick(row, col) {
+            if (!gameState.running || gameState.animating) return;
+            
+            const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+            
+            if (gameState.selectedCell === null) {
+                gameState.selectedCell = { row, col };
+                cell.classList.add('selected');
+            } else {
+                const prevCell = document.querySelector(
+                    `[data-row="${gameState.selectedCell.row}"][data-col="${gameState.selectedCell.col}"]`
+                );
+                prevCell.classList.remove('selected');
+                
+                if (isAdjacent(gameState.selectedCell, { row, col })) {
+                    swapCells(gameState.selectedCell, { row, col });
+                }
+                
+                gameState.selectedCell = null;
+            }
+        }
+        
+        function isAdjacent(cell1, cell2) {
+            const rowDiff = Math.abs(cell1.row - cell2.row);
+            const colDiff = Math.abs(cell1.col - cell2.col);
+            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        }
+        
+        async function swapCells(cell1, cell2) {
+            gameState.animating = true;
+            
+            const temp = gameState.board[cell1.row][cell1.col];
+            gameState.board[cell1.row][cell1.col] = gameState.board[cell2.row][cell2.col];
+            gameState.board[cell2.row][cell2.col] = temp;
+            
+            renderBoard();
+            
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            const matches = findMatches();
+            
+            if (matches.length > 0) {
+                gameState.moves--;
+                updateUI();
+                await processMatches();
+            } else {
+                const temp = gameState.board[cell1.row][cell1.col];
+                gameState.board[cell1.row][cell1.col] = gameState.board[cell2.row][cell2.col];
+                gameState.board[cell2.row][cell2.col] = temp;
+                renderBoard();
+            }
+            
+            gameState.animating = false;
+            
+            if (gameState.moves <= 0) {
+                checkGameEnd();
+            }
+        }
+        
+        function findMatches() {
+            const matches = [];
+            
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE - 2; col++) {
+                    const color = gameState.board[row][col];
+                    if (color === gameState.board[row][col + 1] && 
+                        color === gameState.board[row][col + 2]) {
+                        
+                        let matchCells = [{ row, col }, { row, col: col + 1 }, { row, col: col + 2 }];
+                        let nextCol = col + 3;
+                        while (nextCol < GRID_SIZE && gameState.board[row][nextCol] === color) {
+                            matchCells.push({ row, col: nextCol });
+                            nextCol++;
+                        }
+                        matches.push(matchCells);
+                    }
+                }
+            }
+            
+            for (let col = 0; col < GRID_SIZE; col++) {
+                for (let row = 0; row < GRID_SIZE - 2; row++) {
+                    const color = gameState.board[row][col];
+                    if (color === gameState.board[row + 1][col] && 
+                        color === gameState.board[row + 2][col]) {
+                        
+                        let matchCells = [{ row, col }, { row: row + 1, col }, { row: row + 2, col }];
+                        let nextRow = row + 3;
+                        while (nextRow < GRID_SIZE && gameState.board[nextRow][col] === color) {
+                            matchCells.push({ row: nextRow, col });
+                            nextRow++;
+                        }
+                        matches.push(matchCells);
+                    }
+                }
+            }
+            
+            return matches;
+        }
+        
+        async function processMatches() {
+            let matches = findMatches();
+            
+            while (matches.length > 0) {
+                gameState.combo++;
+                if (gameState.combo > gameState.maxCombo) {
+                    gameState.maxCombo = gameState.combo;
+                }
+                
+                let totalMatched = 0;
+                for (const match of matches) {
+                    totalMatched += match.length;
+                    
+                    for (const cell of match) {
+                        const cellEl = document.querySelector(
+                            `[data-row="${cell.row}"][data-col="${cell.col}"]`
+                        );
+                        if (cellEl) cellEl.classList.add('matching');
+                    }
+                }
+                
+                const baseScore = totalMatched * 10;
+                const comboBonus = gameState.combo * 5;
+                const score = baseScore + comboBonus;
+                gameState.score += score;
+                
+                updateUI();
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                for (const match of matches) {
+                    for (const cell of match) {
+                        gameState.board[cell.row][cell.col] = null;
+                    }
+                }
+                
+                dropCells();
+                fillBoard();
+                renderBoard();
+                
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                matches = findMatches();
+            }
+            
+            gameState.combo = 0;
+            updateUI();
+        }
+        
+        function dropCells() {
+            for (let col = 0; col < GRID_SIZE; col++) {
+                let emptyRow = GRID_SIZE - 1;
+                
+                for (let row = GRID_SIZE - 1; row >= 0; row--) {
+                    if (gameState.board[row][col] !== null) {
+                        if (row !== emptyRow) {
+                            gameState.board[emptyRow][col] = gameState.board[row][col];
+                            gameState.board[row][col] = null;
+                        }
+                        emptyRow--;
+                    }
+                }
+            }
+        }
+        
+        function fillBoard() {
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE; col++) {
+                    if (gameState.board[row][col] === null) {
+                        gameState.board[row][col] = getRandomColor();
+                    }
+                }
+            }
+        }
+        
+        function showHint() {
+            if (gameState.hints <= 0 || !gameState.running) return;
+            
+            gameState.hints--;
+            hintBtn.textContent = `提示 (${gameState.hints})`;
+            
+            for (let row = 0; row < GRID_SIZE; row++) {
+                for (let col = 0; col < GRID_SIZE - 1; col++) {
+                    const temp = gameState.board[row][col];
+                    gameState.board[row][col] = gameState.board[row][col + 1];
+                    gameState.board[row][col + 1] = temp;
+                    
+                    if (findMatches().length > 0) {
+                        gameState.board[row][col + 1] = gameState.board[row][col];
+                        gameState.board[row][col] = temp;
+                        
+                        const cell1 = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+                        const cell2 = document.querySelector(`[data-row="${row}"][data-col="${col + 1}"]`);
+                        
+                        cell1.style.boxShadow = '0 0 30px rgba(255, 255, 0, 1)';
+                        cell2.style.boxShadow = '0 0 30px rgba(255, 255, 0, 1)';
+                        
+                        setTimeout(() => {
+                            cell1.style.boxShadow = '';
+                            cell2.style.boxShadow = '';
+                        }, 2000);
+                        
+                        return;
+                    }
+                    
+                    gameState.board[row][col + 1] = gameState.board[row][col];
+                    gameState.board[row][col] = temp;
+                }
+            }
+        }
+        
+        function checkGameEnd() {
+            gameState.running = false;
+            
+            if (gameState.score >= gameState.target) {
+                resultTitle.textContent = '🎉 胜利！🎉';
+                resultTitle.style.color = '#4ade80';
+            } else {
+                resultTitle.textContent = '游戏结束';
+                resultTitle.style.color = '#f5576c';
+            }
+            
+            finalScoreEl.textContent = gameState.score;
+            maxComboEl.textContent = gameState.maxCombo;
+            
+            gameOverEl.classList.add('show');
+        }
+        
+        function updateUI() {
+            scoreEl.textContent = gameState.score;
+            movesEl.textContent = gameState.moves;
+            comboEl.textContent = gameState.combo;
+            
+            const progress = Math.min(100, (gameState.score / gameState.target) * 100);
+            progressBar.style.width = progress + '%';
+            progressText.textContent = `目标: ${gameState.score}/${gameState.target}`;
+            
+            if (gameState.combo > 1) {
+                comboEl.parentElement.style.animation = 'none';
+                setTimeout(() => {
+                    comboEl.parentElement.style.animation = 'comboPulse 0.5s ease-out';
+                }, 10);
+            }
+        }
+    </script>
+</body>
+</html>
