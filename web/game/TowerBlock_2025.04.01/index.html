@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>3D 堆塔大师</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #d6eaff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #score-container {
+            position: absolute;
+            top: 15%;
+            font-size: 80px;
+            font-weight: bold;
+            color: rgba(50, 50, 50, 0.5);
+            transition: transform 0.2s;
+            text-shadow: 2px 2px 0px rgba(255,255,255,0.5);
+        }
+        #start-screen, #game-over-screen {
+            background: rgba(255, 255, 255, 0.85);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+            transform: scale(1);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .hidden {
+            display: none !important;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            color: #333;
+            font-size: 32px;
+        }
+        p {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 18px;
+        }
+        button {
+            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            font-size: 20px;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(110, 142, 251, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 10px rgba(110, 142, 251, 0.3);
+        }
+        #combo-text {
+            position: absolute;
+            top: 25%;
+            font-size: 30px;
+            font-weight: bold;
+            color: #ff9800;
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.3s;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        .combo-active {
+            opacity: 1 !important;
+            transform: scale(1.2) !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    
+    <div id="ui-layer">
+        <div id="score-container">0</div>
+        <div id="combo-text">完美!</div>
+
+        <div id="start-screen">
+            <h1>3D 堆塔大师</h1>
+            <p>堆叠方块，挑战极限高度</p>
+            <button id="start-btn">开始游戏</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1>游戏结束</h1>
+            <p>得分: <span id="final-score">0</span></p>
+            <button id="restart-btn">再玩一次</button>
+        </div>
+    </div>
+
+    <!-- Three.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+
+    <script>
+        // 游戏配置
+        const CONFIG = {
+            blockSize: 30,
+            blockHeight: 6, // 稍微扁平一点，看起来更好看
+            moveSpeed: 0.8, // 初始速度
+            speedIncrement: 0.02, // 速度增量
+            maxSpeed: 2.5,
+            cameraDistance: 60,
+            cameraHeight: 50,
+            bgColor: 0xd6eaff,
+            blockColors: [0xff7b7b, 0xffb347, 0xfffd82, 0x77dd77, 0x779ecb, 0x9b59b6, 0xff7b7b] // 彩虹色循环
+        };
+
+        // 游戏状态
+        let state = {
+            score: 0,
+            stack: [], // 已放置的方块
+            currentBlock: null, // 当前移动的方块
+            direction: 'x', // 移动方向 'x' 或 'z'
+            isPlaying: false,
+            blockDimension: { width: CONFIG.blockSize, depth: CONFIG.blockSize }, // 当前方块尺寸
+            blockPosition: { x: 0, z: 0 }, // 上一个方块的位置（基准）
+            speed: CONFIG.moveSpeed,
+            colorIndex: 0,
+            combo: 0
+        };
+
+        // Three.js 变量
+        let scene, camera, renderer, light, ambientLight;
+        let fallingBlocks = []; // 掉落的碎片
+
+        // 音频上下文
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'drop') {
+                // 完美放置 - 高音短促
+                oscillator.type = 'sine';
+                // 根据连击数提高音调
+                const pitch = 440 + (state.combo * 50);
+                oscillator.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(pitch * 1.5, audioCtx.currentTime + 0.1);
+                
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'cut') {
+                // 切割 - 稍微低沉一点
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+                
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'gameover') {
+                // 游戏结束 - 下降音
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(200, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        function init() {
+            // 场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(CONFIG.bgColor);
+            // 雾效
+            scene.fog = new THREE.Fog(CONFIG.bgColor, 30, 90);
+
+            // 相机
+            const aspect = window.innerWidth / window.innerHeight;
+            // 使用正交相机获得更好的游戏视角
+            const d = 40;
+            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+            
+            camera.position.set(CONFIG.cameraDistance, CONFIG.cameraHeight, CONFIG.cameraDistance);
+            camera.lookAt(0, 0, 0);
+
+            // 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('game-container').appendChild(renderer.domElement);
+
+            // 灯光
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            light = new THREE.DirectionalLight(0xffffff, 0.6);
+            light.position.set(20, 50, 30);
+            light.castShadow = true;
+            light.shadow.mapSize.width = 2048;
+            light.shadow.mapSize.height = 2048;
+            light.shadow.camera.near = 0.5;
+            light.shadow.camera.far = 200;
+            // 调整阴影相机范围以覆盖塔的高度
+            light.shadow.camera.left = -50;
+            light.shadow.camera.right = 50;
+            light.shadow.camera.top = 50;
+            light.shadow.camera.bottom = -50;
+            scene.add(light);
+
+            // 辅助光，让阴影不那么死黑
+            const backLight = new THREE.DirectionalLight(0x8888ff, 0.3);
+            backLight.position.set(-20, 20, -30);
+            scene.add(backLight);
+
+            // 初始底座
+            addBlock(0, 0, CONFIG.blockSize, CONFIG.blockSize, 0, 0x333344);
+
+            // 事件监听
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousedown', handleInput);
+            document.addEventListener('touchstart', (e) => {
+                // 防止双击缩放
+                e.preventDefault();
+                handleInput(e);
+            }, { passive: false });
+
+            document.getElementById('start-btn').addEventListener('click', (e) => {
+                e.stopPropagation(); // 防止触发 handleInput
+                startGame();
+            });
+
+            document.getElementById('restart-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                startGame();
+            });
+
+            // 动画循环
+            animate();
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const d = 40;
+            camera.left = -d * aspect;
+            camera.right = d * aspect;
+            camera.top = d;
+            camera.bottom = -d;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function getColor(index) {
+            // 平滑颜色过渡
+            const len = CONFIG.blockColors.length;
+            const color1 = new THREE.Color(CONFIG.blockColors[index % len]);
+            const color2 = new THREE.Color(CONFIG.blockColors[(index + 1) % len]);
+            // 简单的每10层循环一次渐变不太容易做平滑，直接按数组取色，或者计算
+            // 这里为了简单和好看，我们每次取一个目标色
+            
+            // 稍微改变一下策略：使用HSL
+            const hue = (index * 0.05) % 1.0;
+            const color = new THREE.Color().setHSL(hue, 0.7, 0.6);
+            return color;
+        }
+
+        function addBlock(x, z, width, depth, yLevel, color = null) {
+            const geometry = new THREE.BoxGeometry(width, CONFIG.blockHeight, depth);
+            
+            if (!color) {
+                color = getColor(state.score);
+            }
+
+            const material = new THREE.MeshLambertMaterial({ color: color });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            // 调整位置，使其底部对齐
+            mesh.position.set(x, yLevel * CONFIG.blockHeight, z);
+            
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            scene.add(mesh);
+            return mesh;
+        }
+
+        function spawnNextBlock() {
+            const y = (state.stack.length) * CONFIG.blockHeight;
+            const lastBlock = state.stack[state.stack.length - 1];
+            
+            state.currentBlock = addBlock(
+                state.direction === 'x' ? -50 : lastBlock.position.x,
+                state.direction === 'z' ? -50 : lastBlock.position.z,
+                state.blockDimension.width,
+                state.blockDimension.depth,
+                state.stack.length // index
+            );
+
+            // 初始位置设置在远处
+            if (state.direction === 'x') {
+                state.currentBlock.position.x = -40;
+                state.currentBlock.position.z = state.blockPosition.z;
+                state.blockMoveData = { pos: -40, dir: 1 }; // 重置移动数据
+            } else {
+                state.currentBlock.position.z = -40;
+                state.currentBlock.position.x = state.blockPosition.x;
+                state.blockMoveData = { pos: -40, dir: 1 }; // 重置移动数据
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            // 重置场景
+            // 移除所有方块除了底座
+            state.stack.forEach(mesh => scene.remove(mesh));
+            if (state.currentBlock) scene.remove(state.currentBlock);
+            fallingBlocks.forEach(obj => scene.remove(obj.mesh));
+            fallingBlocks = [];
+
+            // 重置状态
+            state.stack = [];
+            state.score = 0;
+            state.direction = 'x';
+            state.blockDimension = { width: CONFIG.blockSize, depth: CONFIG.blockSize };
+            state.blockPosition = { x: 0, z: 0 };
+            state.speed = CONFIG.moveSpeed;
+            state.isPlaying = true;
+            state.combo = 0;
+
+            updateScore(0);
+
+            // 添加底座
+            const base = addBlock(0, 0, CONFIG.blockSize, CONFIG.blockSize, 0, 0x333344);
+            state.stack.push(base);
+
+            // 生成第一个方块
+            spawnNextBlock();
+
+            // 重置相机位置
+            camera.position.y = CONFIG.cameraHeight;
+            camera.lookAt(0, 0, 0);
+        }
+
+        function handleInput(e) {
+            if (!state.isPlaying) return;
+            if (e.type === 'touchstart') e.preventDefault(); // Prevent double firing on some devices
+
+            placeBlock();
+        }
+
+        function placeBlock() {
+            const current = state.currentBlock;
+            const last = state.stack[state.stack.length - 1];
+            
+            const deltaX = current.position.x - last.position.x;
+            const deltaZ = current.position.z - last.position.z;
+            
+            const diff = state.direction === 'x' ? deltaX : deltaZ;
+            const absDiff = Math.abs(diff);
+            
+            // 容差，如果非常接近则视为完美
+            const tolerance = 0.5;
+            
+            let overlap;
+            let size = state.direction === 'x' ? state.blockDimension.width : state.blockDimension.depth;
+            
+            if (absDiff < tolerance) {
+                // 完美重合
+                placePerfect(current, last);
+            } else if (absDiff < size) {
+                // 部分重合
+                placeCut(current, last, diff, size);
+            } else {
+                // 完全未重合
+                gameOver();
+                return;
+            }
+            
+            // 准备下一轮
+            state.score++;
+            updateScore(state.score);
+            state.direction = state.direction === 'x' ? 'z' : 'x';
+            
+            // 增加速度
+            if (state.speed < CONFIG.maxSpeed) {
+                state.speed += CONFIG.speedIncrement;
+            }
+
+            spawnNextBlock();
+            moveCamera();
+        }
+
+        function showCombo() {
+            const el = document.getElementById('combo-text');
+            el.innerText = ["完美!", "太棒了!", "神乎其技!"][Math.min(state.combo - 1, 2)];
+            el.classList.add('combo-active');
+            setTimeout(() => {
+                el.classList.remove('combo-active');
+            }, 500);
+        }
+
+        function placePerfect(current, last) {
+            playSound('drop');
+            state.combo++;
+            
+            // 修正位置为完美对齐
+            current.position.x = last.position.x;
+            current.position.z = last.position.z;
+            
+            state.stack.push(current);
+            state.blockPosition = { x: current.position.x, z: current.position.z };
+            
+            // 连击奖励视觉效果
+            if (state.combo >= 2) {
+                showCombo();
+                createPerfectEffect(current);
+            }
+        }
+
+        function placeCut(current, last, diff, size) {
+            playSound('cut');
+            state.combo = 0;
+            
+            const cutSize = Math.abs(diff);
+            const remainingSize = size - cutSize;
+            const shift = diff / 2;
+            
+            // 更新当前方块尺寸和位置（保留的部分）
+            if (state.direction === 'x') {
+                state.blockDimension.width = remainingSize;
+                current.scale.x = remainingSize / size; // 缩放
+                // 重新计算位置：
+                // 如果 diff > 0 (current 在 last 右边), 则保留左边部分，中心点左移 cutSize/2
+                // 如果 diff < 0 (current 在 last 左边), 则保留右边部分，中心点右移 cutSize/2
+                current.position.x = last.position.x + (diff > 0 ? (remainingSize - size)/2 + cutSize : -(remainingSize - size)/2 - cutSize);
+                // 实际上 simpler math:
+                current.position.x = last.position.x + diff / 2; 
+                // Wait, logic check.
+                // Center of new block should be: LastCenter + (Diff / 2) ? No.
+                // Let's rely on edges.
+                // Left edge of last: L_pos - L_size/2
+                // Right edge of last: L_pos + L_size/2
+                // ...
+                
+                // 更简单的逻辑：直接替换 current 为一个新的 Mesh，大小正确
+                scene.remove(current);
+                
+                // 计算保留部分的中心位置
+                const newCenter = last.position.x + diff / 2;
+                
+                const keptBlock = addBlock(
+                    newCenter, 
+                    current.position.z, 
+                    remainingSize, 
+                    state.blockDimension.depth, 
+                    state.stack.length, 
+                    current.material.color
+                );
+                
+                state.stack.push(keptBlock);
+                state.blockPosition = { x: keptBlock.position.x, z: keptBlock.position.z };
+                
+                // 创建掉落的部分
+                const fallingSize = cutSize;
+                const fallingCenter = last.position.x + (diff > 0 ? (size/2 + diff/2) : (-size/2 + diff/2)); 
+                // Math is tricky, let's simplify:
+                // If diff > 0, falling part is on the right. Center is current.x + (remainingSize/2)
+                
+                const fallingPos = current.position.x + (diff > 0 ? remainingSize / 2 : -remainingSize / 2);
+                
+                createFallingBlock(
+                    fallingPos, 
+                    current.position.z, 
+                    fallingSize, 
+                    state.blockDimension.depth, 
+                    current.position.y, // world y
+                    current.material.color
+                );
+
+            } else {
+                state.blockDimension.depth = remainingSize;
+                scene.remove(current);
+                
+                const newCenter = last.position.z + diff / 2;
+                
+                const keptBlock = addBlock(
+                    current.position.x,
+                    newCenter,
+                    state.blockDimension.width,
+                    remainingSize,
+                    state.stack.length,
+                    current.material.color
+                );
+                
+                state.stack.push(keptBlock);
+                state.blockPosition = { x: keptBlock.position.x, z: keptBlock.position.z };
+                
+                const fallingPos = current.position.z + (diff > 0 ? remainingSize / 2 : -remainingSize / 2);
+                
+                createFallingBlock(
+                    current.position.x,
+                    fallingPos,
+                    state.blockDimension.width,
+                    cutSize,
+                    current.position.y,
+                    current.material.color
+                );
+            }
+        }
+
+        function createFallingBlock(x, z, width, depth, y, color) {
+            const geometry = new THREE.BoxGeometry(width, CONFIG.blockHeight, depth);
+            const material = new THREE.MeshLambertMaterial({ color: color });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            
+            fallingBlocks.push({
+                mesh: mesh,
+                velocity: { y: 0, x: (Math.random() - 0.5) * 0.5, z: (Math.random() - 0.5) * 0.5 },
+                rotation: { x: Math.random() * 0.1, z: Math.random() * 0.1 }
+            });
+        }
+
+        function createPerfectEffect(block) {
+            // 简单的粒子效果或闪光
+            const geometry = new THREE.PlaneGeometry(block.geometry.parameters.width + 5, block.geometry.parameters.depth + 5);
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, 
+                transparent: true, 
+                opacity: 0.5,
+                side: THREE.DoubleSide
+            });
+            const plane = new THREE.Mesh(geometry, material);
+            plane.rotation.x = -Math.PI / 2;
+            plane.position.copy(block.position);
+            plane.position.y -= CONFIG.blockHeight / 2; // Bottom
+            scene.add(plane);
+            
+            // 动画化并移除
+            const animateEffect = () => {
+                plane.scale.x += 0.05;
+                plane.scale.y += 0.05;
+                plane.material.opacity -= 0.03;
+                if (plane.material.opacity > 0) {
+                    requestAnimationFrame(animateEffect);
+                } else {
+                    scene.remove(plane);
+                }
+            };
+            animateEffect();
+        }
+
+        function gameOver() {
+            playSound('gameover');
+            state.isPlaying = false;
+            
+            // 让当前方块掉落
+            if (state.currentBlock) {
+                scene.remove(state.currentBlock);
+                createFallingBlock(
+                    state.currentBlock.position.x,
+                    state.currentBlock.position.z,
+                    state.blockDimension.width,
+                    state.blockDimension.depth,
+                    state.currentBlock.position.y,
+                    state.currentBlock.material.color
+                );
+            }
+            
+            document.getElementById('final-score').innerText = state.score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function updateScore(s) {
+            document.getElementById('score-container').innerText = s;
+        }
+
+        function moveCamera() {
+            // 随着塔变高，相机向上移动
+            if (state.stack.length > 3) {
+                const targetY = CONFIG.cameraHeight + (state.stack.length - 2) * CONFIG.blockHeight;
+                // 平滑移动将在 animate 中处理，这里只设置目标？
+                // 简单点，直接在这用 Tween 或者在 animate 插值
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 更新掉落方块
+            for (let i = fallingBlocks.length - 1; i >= 0; i--) {
+                const obj = fallingBlocks[i];
+                obj.velocity.y -= 0.8; // 重力
+                obj.mesh.position.y += obj.velocity.y;
+                obj.mesh.position.x += obj.velocity.x;
+                obj.mesh.position.z += obj.velocity.z;
+                obj.mesh.rotation.x += obj.rotation.x;
+                obj.mesh.rotation.z += obj.rotation.z;
+
+                if (obj.mesh.position.y < -100) {
+                    scene.remove(obj.mesh);
+                    fallingBlocks.splice(i, 1);
+                }
+            }
+
+            if (state.isPlaying && state.currentBlock) {
+                // 移动当前方块
+                const time = Date.now() * 0.001 * state.speed;
+                // 使用正弦波移动
+                const range = 35; // 移动范围
+                // 为了保证速度恒定，不应该用 sin(time)，因为 sin 的斜率是变化的。
+                // 应该用线性往复运动
+                
+                // 简单实现：
+                // const val = Math.sin(time) * range; 
+                // 这种方式两端慢中间快，有点难把握时机。
+                
+                // 线性乒乓实现
+                // pos = (time % 2) ...
+                
+                // 让我们还是用 sin 吧，因为它平滑。如果用户觉得难，可以改成线性的。
+                // 但是标准 Stack 游戏通常是线性的。
+                
+                // 线性实现：
+                const speed = state.speed * 40; // 像素/秒
+                const limit = 45;
+                
+                // 使用 Date.now() 计算绝对位置会导致跳跃，使用增量
+                if (!state.lastTime) state.lastTime = Date.now();
+                const now = Date.now();
+                const dt = (now - state.lastTime) / 1000;
+                state.lastTime = now;
+                
+                // 初始化 block 移动数据
+                if (!state.blockMoveData) {
+                    state.blockMoveData = { pos: -40, dir: 1 };
+                }
+                
+                state.blockMoveData.pos += state.blockMoveData.dir * speed * dt;
+                
+                if (state.blockMoveData.pos > limit) {
+                    state.blockMoveData.pos = limit;
+                    state.blockMoveData.dir = -1;
+                } else if (state.blockMoveData.pos < -limit) {
+                    state.blockMoveData.pos = -limit;
+                    state.blockMoveData.dir = 1;
+                }
+
+                if (state.direction === 'x') {
+                    state.currentBlock.position.x = state.blockMoveData.pos;
+                } else {
+                    state.currentBlock.position.z = state.blockMoveData.pos;
+                }
+            } else {
+                state.lastTime = Date.now(); // 保持时间同步
+            }
+
+            // 相机平滑跟随
+            if (state.stack.length > 0) {
+                const targetY = CONFIG.cameraHeight + (state.stack.length) * CONFIG.blockHeight;
+                camera.position.y += (targetY - camera.position.y) * 0.05;
+                camera.lookAt(0, camera.position.y - CONFIG.cameraHeight, 0);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // 初始化
+        init();
+
+    </script>
+</body>
+</html>
